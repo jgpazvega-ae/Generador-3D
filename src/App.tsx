@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import type { ApiConfig, UploadedImage, Measurements } from './types';
+import type {
+  ApiConfig,
+  UploadedImage,
+  Measurements,
+  GenerationSettings,
+} from './types';
 import { useGeneration } from './hooks/useGeneration';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import Header from './components/Header';
@@ -24,6 +29,11 @@ export default function App() {
     depth: '',
     unit: 'cm',
   });
+  const [settings, setSettings] = useState<GenerationSettings>({
+    quality: 'standard',
+    removeBackground: true,
+    scaleToMeasurements: true,
+  });
 
   const { state: gen, generate, reset } = useGeneration();
 
@@ -37,7 +47,7 @@ export default function App() {
   const handleGenerate = async () => {
     if (!apiConfig) return;
     setStep('processing');
-    await generate(apiConfig, images, measurements);
+    await generate(apiConfig, images, settings, measurements);
     setStep('result');
   };
 
@@ -69,6 +79,8 @@ export default function App() {
             onImagesChange={setImages}
             measurements={measurements}
             onMeasurementsChange={setMeasurements}
+            settings={settings}
+            onSettingsChange={setSettings}
             onGenerate={handleGenerate}
             onBack={() => setStep('config')}
             provider={apiConfig.provider}

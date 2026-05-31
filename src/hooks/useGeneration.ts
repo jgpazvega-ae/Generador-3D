@@ -4,12 +4,18 @@ import type {
   UploadedImage,
   Measurements,
   GenerationState,
+  GenerationSettings,
   ModelResult,
 } from '../types';
+import { QUALITY_PROFILES } from '../types';
 import { createMeshyTask, pollMeshyTask } from '../api/meshy';
-import { generateStabilityFast3D } from '../api/stability';
-import { generateHunyuan3D, DEFAULT_REPLICATE_MODEL } from '../api/replicate';
-import { compressImageToDataUrl } from '../utils/imageUtils';
+import { generateStability3D } from '../api/stability';
+import { generateHunyuan3D } from '../api/replicate';
+import {
+  compressImageToDataUrl,
+  removeImageBackground,
+} from '../utils/imageUtils';
+import { scaleGlbToMeasurements } from '../utils/glbScaling';
 
 export function useGeneration() {
   const [state, setState] = useState<GenerationState>({
@@ -22,7 +28,8 @@ export function useGeneration() {
     async (
       config: ApiConfig,
       images: UploadedImage[],
-      measurements?: Measurements,
+      settings: GenerationSettings,
+      measurements: Measurements,
     ) => {
       setState({ status: 'pending', progress: 0, message: 'Iniciando...' });
 
@@ -31,37 +38,76 @@ export function useGeneration() {
       };
 
       try {
-        // Compress images to data URLs before sending
-        onProgress(2, 'Comprimiendo imágenes...');
+        const quality = QUALITY_PROFILES[settings.quality];
+
+        // 1. Preprocesado: (opcional) quitar fondo + comprimir/orientar
+        let prepared = images;
+        if (settings.removeBackground) {
+          onProgress(2, 'Eliminando fondo de las imágenes...');
+          prepared = await Promise.all(
+            images.map(async (img) =>
+              img.bgRemoved
+                ? img
+                : { ...img, file: await removeImageBackground(img.file), bgRemoved: true },
+            ),
+          );
+        }
+
+        onProgress(5, 'Optimizando imágenes...');
         const compressed = await Promise.all(
-          images.map(async (img) => ({
+          prepared.map(async (img) => ({
             ...img,
             dataUrl: await compressImageToDataUrl(img.file),
           })),
         );
 
+        // 2. Generación según proveedor
         let result: ModelResult;
-
         if (config.provider === 'meshy') {
           onProgress(8, 'Creando tarea en Meshy AI...');
-          const taskId = await createMeshyTask(config.apiKey, compressed);
-          onProgress(12, 'Procesando imágenes...');
-          result = await pollMeshyTask(config.apiKey, taskId, onProgress);
+          const { taskId, endpoint } = await createMeshyTask(
+            config.apiKey,
+            compressed,
+            quality,
+          );
+          result = await pollMeshyTask(config.apiKey, taskId, endpoint, onProgress);
         } else if (config.provider === 'stability') {
-          result = await generateStabilityFast3D(
+          result = await generateStability3D(
             config.apiKey,
             compressed[0],
+            quality,
             onProgress,
           );
         } else {
-          const modelVersion =
-            config.replicateModel?.trim() || DEFAULT_REPLICATE_MODEL;
           result = await generateHunyuan3D(
             config.apiKey,
             compressed,
-            modelVersion,
+            quality,
             onProgress,
+            config.replicateModel,
           );
+        }
+
+        // 3. Post-proceso: escalar a las medidas reales
+        if (settings.scaleToMeasurements && result.glbUrl) {
+          try {
+            onProgress(96, 'Ajustando modelo a las medidas reales...');
+            const scaledBlob = await scaleGlbToMeasurements(
+              result.glbUrl,
+              measurements,
+            );
+            if (scaledBlob) {
+              if (result.isBlob) URL.revokeObjectURL(result.glbUrl);
+              result = {
+                ...result,
+                glbUrl: URL.createObjectURL(scaledBlob),
+                isBlob: true,
+                scaled: true,
+              };
+            }
+          } catch (e) {
+            console.warn('No se pudo escalar el GLB:', e);
+          }
         }
 
         setState({
@@ -78,9 +124,6 @@ export function useGeneration() {
           error: err instanceof Error ? err.message : 'Error desconocido',
         });
       }
-
-      // Suppress unused warning — measurements stored for future use
-      void measurements;
     },
     [],
   );

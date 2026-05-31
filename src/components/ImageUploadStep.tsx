@@ -1,15 +1,24 @@
 import { useRef, useState, useCallback } from 'react';
-import { Upload, X, RotateCcw, Wand2, ChevronLeft, AlertCircle } from 'lucide-react';
-import type { UploadedImage, ViewAngle, Measurements, ApiProvider } from '../types';
+import { Upload, X, Camera, Wand2, ChevronLeft, AlertCircle } from 'lucide-react';
+import type {
+  UploadedImage,
+  ViewAngle,
+  Measurements,
+  ApiProvider,
+  GenerationSettings,
+} from '../types';
 import { ANGLE_LABELS, ANGLE_ICONS } from '../types';
 import { createObjectUrl, validateImageFile, compressImageToDataUrl } from '../utils/imageUtils';
 import MeasurementsPanel from './MeasurementsPanel';
+import SettingsPanel from './SettingsPanel';
 
 interface Props {
   images: UploadedImage[];
   onImagesChange: (images: UploadedImage[]) => void;
   measurements: Measurements;
   onMeasurementsChange: (m: Measurements) => void;
+  settings: GenerationSettings;
+  onSettingsChange: (s: GenerationSettings) => void;
   onGenerate: () => void;
   onBack: () => void;
   provider: ApiProvider;
@@ -17,7 +26,7 @@ interface Props {
 
 const MAX_IMAGES: Record<ApiProvider, number> = {
   replicate: 4,
-  meshy: 6,
+  meshy: 4,
   stability: 1,
 };
 
@@ -28,6 +37,8 @@ export default function ImageUploadStep({
   onImagesChange,
   measurements,
   onMeasurementsChange,
+  settings,
+  onSettingsChange,
   onGenerate,
   onBack,
   provider,
@@ -244,19 +255,30 @@ export default function ImageUploadStep({
         </div>
       )}
 
-      {/* Tip about angles */}
-      {images.length > 0 && provider !== 'stability' && (
-        <div className="flex items-start gap-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
-          <RotateCcw className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-indigo-300">Consejo de calidad</p>
-            <p className="text-sm text-slate-400 mt-0.5">
-              Para mejores resultados agrega al menos frente, atrás e izquierda/derecha.
-              Cuantos más ángulos, más preciso será el modelo 3D.
-            </p>
-          </div>
+      {/* Photo guidance for max similarity */}
+      <div className="flex items-start gap-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
+        <Camera className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-indigo-300">
+            Cómo lograr ~99% de similitud
+          </p>
+          <ul className="text-sm text-slate-400 mt-1 space-y-0.5 list-disc list-inside">
+            {provider !== 'stability' && (
+              <li>Sube frente, atrás e izquierda/derecha del mismo objeto.</li>
+            )}
+            <li>Fondo liso y uniforme, buena iluminación sin sombras duras.</li>
+            <li>La pieza centrada, nítida y ocupando casi todo el encuadre.</li>
+            <li>Mantén la misma distancia y evita reflejos o brillos.</li>
+          </ul>
         </div>
-      )}
+      </div>
+
+      {/* Quality & precision settings */}
+      <SettingsPanel
+        value={settings}
+        onChange={onSettingsChange}
+        hasMeasurements={!!(measurements.width || measurements.height || measurements.depth)}
+      />
 
       {/* Measurements */}
       <MeasurementsPanel value={measurements} onChange={onMeasurementsChange} />

@@ -1,10 +1,11 @@
-import type { UploadedImage, ModelResult } from '../types';
+import type { UploadedImage, ModelResult, QualityProfile } from '../types';
 
 const BASE = 'https://api.replicate.com/v1';
 
-// Default: Hunyuan 3D 2.0 on Replicate
-export const DEFAULT_REPLICATE_MODEL =
-  'tencent/hunyuan3d-2:latest';
+// Modelo single-image por defecto (Hunyuan 3D 2 de Tencent)
+export const DEFAULT_REPLICATE_MODEL = 'tencent/hunyuan3d-2';
+// Modelo multiview (usa frente/atrás/izquierda) cuando hay varias vistas
+export const MULTIVIEW_REPLICATE_MODEL = 'tencent/hunyuan3d-2mv';
 
 interface ReplicatePrediction {
   id: string;
@@ -19,26 +20,22 @@ async function createPrediction(
   modelVersion: string,
   input: Record<string, unknown>,
 ): Promise<string> {
-  // modelVersion can be "owner/model:version" or "owner/model:latest"
   const [modelPath, version] = modelVersion.split(':');
   const [owner, model] = modelPath.split('/');
 
-  const endpoint =
-    version && version !== 'latest'
-      ? `${BASE}/predictions`
-      : `${BASE}/models/${owner}/${model}/predictions`;
+  const useVersion = version && version !== 'latest';
+  const endpoint = useVersion
+    ? `${BASE}/predictions`
+    : `${BASE}/models/${owner}/${model}/predictions`;
 
   const body: Record<string, unknown> = { input };
-  if (version && version !== 'latest') {
-    body.version = version;
-  }
+  if (useVersion) body.version = version;
 
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Token ${apiKey}`,
       'Content-Type': 'application/json',
-      Prefer: 'wait',
     },
     body: JSON.stringify(body),
   });
@@ -68,37 +65,46 @@ async function getPrediction(
 export async function generateHunyuan3D(
   apiKey: string,
   images: UploadedImage[],
-  modelVersion: string,
+  quality: QualityProfile,
   onProgress: (progress: number, message: string) => void,
+  userModel?: string,
 ): Promise<ModelResult> {
-  onProgress(5, 'Enviando imágenes a Replicate (Hunyuan 3D)...');
+  const multiview = images.length > 1;
+  const byAngle = (a: string) => images.find((i) => i.angle === a)?.dataUrl;
+  const front = byAngle('front') ?? images[0].dataUrl;
 
-  const primary = images[0];
+  let modelVersion: string;
+  let input: Record<string, unknown>;
 
-  const input: Record<string, unknown> = {
-    image: primary.dataUrl,
-    steps: 50,
-    guidance_scale: 5,
-    octree_resolution: 256,
-    num_chunks: 200000,
-    randomize_seed: true,
-    seed: 42,
-  };
-
-  if (images.length > 1) {
-    input.image_front = images.find((i) => i.angle === 'front')?.dataUrl ?? primary.dataUrl;
-    const back = images.find((i) => i.angle === 'back');
-    const left = images.find((i) => i.angle === 'left');
-    const right = images.find((i) => i.angle === 'right');
-    if (back) input.image_back = back.dataUrl;
-    if (left) input.image_left = left.dataUrl;
-    if (right) input.image_right = right.dataUrl;
+  if (multiview && !userModel) {
+    modelVersion = MULTIVIEW_REPLICATE_MODEL;
+    input = {
+      front_image: front,
+      back_image: byAngle('back'),
+      left_image: byAngle('left') ?? byAngle('right'),
+      steps: quality.hunyuanSteps,
+      guidance_scale: 5.5,
+      octree_resolution: quality.hunyuanOctree,
+      remove_background: true,
+    };
+    // Quitar claves vacías
+    Object.keys(input).forEach((k) => input[k] == null && delete input[k]);
+  } else {
+    modelVersion = userModel?.trim() || DEFAULT_REPLICATE_MODEL;
+    input = {
+      image: front,
+      steps: quality.hunyuanSteps,
+      guidance_scale: 5.5,
+      octree_resolution: quality.hunyuanOctree,
+      remove_background: true,
+    };
   }
 
-  onProgress(10, 'Tarea creada, en cola...');
+  onProgress(8, `Enviando a Replicate (${modelVersion.split('/')[1] ?? modelVersion})...`);
   const predictionId = await createPrediction(apiKey, modelVersion, input);
 
-  const deadline = Date.now() + 600000;
+  const start = Date.now();
+  const deadline = start + 600000;
   let dots = 0;
 
   while (Date.now() < deadline) {
@@ -112,7 +118,6 @@ export async function generateHunyuan3D(
         output.find((u) => typeof u === 'string' && u.endsWith('.glb')) ??
         output[0];
       if (!glbUrl) throw new Error('El modelo no produjo archivo GLB');
-
       return { glbUrl, taskId: predictionId, isBlob: false };
     }
 
@@ -124,11 +129,11 @@ export async function generateHunyuan3D(
     const ellipsis = '.'.repeat(dots + 1);
     const logLine = prediction.logs?.split('\n').filter(Boolean).pop() ?? '';
     const statusMsg = logLine
-      ? `Hunyuan 3D procesando${ellipsis} ${logLine.slice(-60)}`
+      ? `Hunyuan 3D${ellipsis} ${logLine.slice(-50)}`
       : `Hunyuan 3D generando modelo${ellipsis}`;
 
-    const elapsed = (Date.now() - (deadline - 600000)) / 1000;
-    const approxProgress = Math.min(90, Math.round((elapsed / 120) * 90));
+    const elapsed = (Date.now() - start) / 1000;
+    const approxProgress = Math.min(90, Math.round((elapsed / 130) * 90));
     onProgress(approxProgress, statusMsg);
 
     await new Promise((r) => setTimeout(r, 5000));

@@ -50,6 +50,7 @@ export default function ResultStep({ result, measurements, images, onStartOver }
           <p className="font-semibold text-emerald-300">¡Modelo 3D generado!</p>
           <p className="text-sm text-slate-400">
             Puedes rotar, hacer zoom y descargar el modelo a continuación.
+            {result.scaled && ' El modelo fue escalado a tus medidas reales.'}
           </p>
         </div>
       </div>
