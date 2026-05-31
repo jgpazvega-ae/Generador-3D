@@ -38,6 +38,8 @@ export async function createMeshyTask(
     should_remesh: true,
     should_texture: true,
     enable_pbr: quality.enablePbr,
+    // Textura base 4K: solo soportado por meshy-6
+    hd_texture: quality.meshyModel === 'meshy-6',
   };
 
   const body: Record<string, unknown> = multi

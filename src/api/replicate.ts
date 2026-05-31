@@ -81,10 +81,12 @@ export async function generateHunyuan3D(
     input = {
       front_image: front,
       back_image: byAngle('back'),
-      left_image: byAngle('left') ?? byAngle('right'),
+      left_image: byAngle('left'),
+      right_image: byAngle('right'),
       steps: quality.hunyuanSteps,
       guidance_scale: 5.5,
       octree_resolution: quality.hunyuanOctree,
+      target_face_num: quality.hunyuanFaces,
       remove_background: true,
     };
     // Quitar claves vacías
@@ -96,6 +98,7 @@ export async function generateHunyuan3D(
       steps: quality.hunyuanSteps,
       guidance_scale: 5.5,
       octree_resolution: quality.hunyuanOctree,
+      target_face_num: quality.hunyuanFaces,
       remove_background: true,
     };
   }

@@ -81,6 +81,7 @@ export interface QualityProfile {
   // Replicate / Hunyuan
   hunyuanSteps: number;
   hunyuanOctree: 256 | 384 | 512;
+  hunyuanFaces: number;
 }
 
 export const QUALITY_PROFILES: Record<QualityPreset, QualityProfile> = {
@@ -93,6 +94,7 @@ export const QUALITY_PROFILES: Record<QualityPreset, QualityProfile> = {
     stabilityTextureResolution: 1024,
     hunyuanSteps: 30,
     hunyuanOctree: 256,
+    hunyuanFaces: 30000,
   },
   standard: {
     label: 'Estándar',
@@ -103,6 +105,7 @@ export const QUALITY_PROFILES: Record<QualityPreset, QualityProfile> = {
     stabilityTextureResolution: 2048,
     hunyuanSteps: 40,
     hunyuanOctree: 384,
+    hunyuanFaces: 100000,
   },
   max: {
     label: 'Máxima',
@@ -113,6 +116,7 @@ export const QUALITY_PROFILES: Record<QualityPreset, QualityProfile> = {
     stabilityTextureResolution: 2048,
     hunyuanSteps: 50,
     hunyuanOctree: 512,
+    hunyuanFaces: 300000,
   },
 };
 
