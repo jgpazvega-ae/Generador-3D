@@ -1,0 +1,287 @@
+import { useRef, useState, useCallback } from 'react';
+import { Upload, X, RotateCcw, Wand2, ChevronLeft, AlertCircle } from 'lucide-react';
+import type { UploadedImage, ViewAngle, Measurements, ApiProvider } from '../types';
+import { ANGLE_LABELS, ANGLE_ICONS } from '../types';
+import { createObjectUrl, validateImageFile, compressImageToDataUrl } from '../utils/imageUtils';
+import MeasurementsPanel from './MeasurementsPanel';
+
+interface Props {
+  images: UploadedImage[];
+  onImagesChange: (images: UploadedImage[]) => void;
+  measurements: Measurements;
+  onMeasurementsChange: (m: Measurements) => void;
+  onGenerate: () => void;
+  onBack: () => void;
+  provider: ApiProvider;
+}
+
+const MAX_IMAGES: Record<ApiProvider, number> = {
+  replicate: 4,
+  meshy: 6,
+  stability: 1,
+};
+
+const ANGLES: ViewAngle[] = ['front', 'back', 'left', 'right', 'top', 'bottom', 'diagonal', 'custom'];
+
+export default function ImageUploadStep({
+  images,
+  onImagesChange,
+  measurements,
+  onMeasurementsChange,
+  onGenerate,
+  onBack,
+  provider,
+}: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const maxImages = MAX_IMAGES[provider];
+
+  const processFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const arr = Array.from(files);
+      const remaining = maxImages - images.length;
+      if (remaining <= 0) {
+        setError(`Máximo ${maxImages} imagen${maxImages > 1 ? 'es' : ''} para este proveedor`);
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      const toProcess = arr.slice(0, remaining);
+      const newImages: UploadedImage[] = [];
+
+      for (const file of toProcess) {
+        const validationError = validateImageFile(file);
+        if (validationError) {
+          setError(validationError);
+          continue;
+        }
+
+        const preview = createObjectUrl(file);
+        const dataUrl = await compressImageToDataUrl(file).catch(() => '');
+
+        const usedAngles = new Set(images.map((i) => i.angle));
+        const defaultAngle =
+          ANGLES.find((a) => !usedAngles.has(a)) ?? 'custom';
+
+        newImages.push({
+          id: `${Date.now()}-${Math.random()}`,
+          file,
+          preview,
+          dataUrl,
+          angle: defaultAngle,
+        });
+      }
+
+      onImagesChange([...images, ...newImages]);
+      setLoading(false);
+    },
+    [images, maxImages, onImagesChange],
+  );
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    processFiles(e.dataTransfer.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = () => setDragging(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      processFiles(e.target.files);
+      e.target.value = '';
+    }
+  };
+
+  const removeImage = (id: string) => {
+    const img = images.find((i) => i.id === id);
+    if (img) URL.revokeObjectURL(img.preview);
+    onImagesChange(images.filter((i) => i.id !== id));
+  };
+
+  const updateAngle = (id: string, angle: ViewAngle) => {
+    onImagesChange(images.map((img) => (img.id === id ? { ...img, angle } : img)));
+  };
+
+  const canGenerate = images.length > 0;
+  const atMax = images.length >= maxImages;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Sube fotos de tu pieza
+        </h2>
+        <p className="text-slate-400 text-sm">
+          {provider === 'stability'
+            ? 'Este proveedor usa 1 imagen. Elige la mejor vista.'
+            : `Sube hasta ${maxImages} fotos desde distintos ángulos para mejor calidad`}
+        </p>
+      </div>
+
+      {/* Drop zone */}
+      {!atMax && (
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`
+            border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200
+            ${dragging ? 'border-indigo-500 bg-indigo-500/5' : 'border-[#2a2a4a] hover:border-indigo-500/50 hover:bg-white/[0.02]'}
+          `}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple={maxImages > 1}
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          {loading ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-400">Procesando imágenes...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 bg-[#1a1a38] rounded-2xl flex items-center justify-center">
+                <Upload className="w-7 h-7 text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-white font-medium">
+                  Arrastra aquí o{' '}
+                  <span className="text-indigo-400 underline underline-offset-2">
+                    haz clic para seleccionar
+                  </span>
+                </p>
+                <p className="text-slate-500 text-sm mt-1">
+                  JPEG, PNG o WebP · máx. 20 MB por imagen
+                </p>
+              </div>
+              {images.length > 0 && (
+                <p className="text-slate-600 text-xs">
+                  {images.length}/{maxImages} imagen{images.length !== 1 ? 'es' : ''} cargada{images.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Image grid */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {images.map((img, i) => (
+            <div key={img.id} className="card-sm p-0 overflow-hidden group relative">
+              {/* Preview */}
+              <div className="aspect-square bg-[#0f0f25] relative overflow-hidden">
+                <img
+                  src={img.preview}
+                  alt={`Vista ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+
+                {/* Index badge */}
+                <div className="absolute top-2 left-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-xs font-bold text-white">
+                  {i + 1}
+                </div>
+
+                {/* Remove button */}
+                <button
+                  onClick={() => removeImage(img.id)}
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-red-500/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+
+              {/* Angle selector */}
+              <div className="p-3">
+                <label className="label text-xs mb-1.5">Ángulo de vista</label>
+                <select
+                  value={img.angle}
+                  onChange={(e) => updateAngle(img.id, e.target.value as ViewAngle)}
+                  className="w-full bg-[#0f0f25] border border-[#2a2a4a] rounded-lg px-2 py-1.5 text-sm text-white outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  {ANGLES.map((a) => (
+                    <option key={a} value={a}>
+                      {ANGLE_ICONS[a]} {ANGLE_LABELS[a]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+
+          {/* Add more slot */}
+          {!atMax && (
+            <button
+              onClick={() => inputRef.current?.click()}
+              className="aspect-square rounded-xl border-2 border-dashed border-[#2a2a4a] hover:border-indigo-500/50 flex flex-col items-center justify-center gap-2 text-slate-600 hover:text-indigo-400 transition-all"
+            >
+              <Upload className="w-6 h-6" />
+              <span className="text-xs">Agregar</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Tip about angles */}
+      {images.length > 0 && provider !== 'stability' && (
+        <div className="flex items-start gap-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
+          <RotateCcw className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-indigo-300">Consejo de calidad</p>
+            <p className="text-sm text-slate-400 mt-0.5">
+              Para mejores resultados agrega al menos frente, atrás e izquierda/derecha.
+              Cuantos más ángulos, más preciso será el modelo 3D.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Measurements */}
+      <MeasurementsPanel value={measurements} onChange={onMeasurementsChange} />
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button onClick={onBack} className="btn-secondary flex items-center gap-2">
+          <ChevronLeft className="w-4 h-4" />
+          Atrás
+        </button>
+
+        <button
+          onClick={onGenerate}
+          disabled={!canGenerate}
+          className="btn-primary flex-1 flex items-center justify-center gap-2 py-4 text-base disabled:opacity-40"
+        >
+          <Wand2 className="w-5 h-5" />
+          Generar modelo 3D
+          {images.length > 0 && (
+            <span className="ml-1 opacity-70 text-sm">
+              ({images.length} foto{images.length !== 1 ? 's' : ''})
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
