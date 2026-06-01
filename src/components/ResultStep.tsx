@@ -58,12 +58,29 @@ export default function ResultStep({ result, measurements, images, onStartOver }
       <div className="grid lg:grid-cols-5 gap-6">
         {/* 3D Viewer — takes 3 cols */}
         <div className="lg:col-span-3">
-          <div className="card p-0 overflow-hidden h-[420px] lg:h-[500px]">
-            <ModelViewerComponent src={result.glbUrl} poster={result.thumbnailUrl} />
-          </div>
-          <p className="text-xs text-slate-600 text-center mt-2">
-            Arrastra para rotar · Scroll para zoom · Doble clic para auto-zoom
-          </p>
+          {result.glbUrl ? (
+            <>
+              <div className="card p-0 overflow-hidden h-[420px] lg:h-[500px]">
+                <ModelViewerComponent src={result.glbUrl} poster={result.thumbnailUrl} />
+              </div>
+              <p className="text-xs text-slate-600 text-center mt-2">
+                Arrastra para rotar · Scroll para zoom · Doble clic para auto-zoom
+              </p>
+            </>
+          ) : (
+            <div className="card h-[420px] lg:h-[500px] flex flex-col items-center justify-center gap-4 text-center">
+              <div className="w-24 h-24 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-5xl">
+                🧊
+              </div>
+              <div>
+                <p className="font-semibold text-white mb-1">Modelo 3D generado (OBJ)</p>
+                <p className="text-sm text-slate-400 max-w-xs">
+                  El formato OBJ no tiene vista previa en el navegador.
+                  Descárgalo y ábrelo en Blender, MeshLab o cualquier visor 3D.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right panel — 2 cols */}

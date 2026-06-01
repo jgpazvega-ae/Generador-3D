@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star } from 'lucide-react';
+import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star, Sparkles } from 'lucide-react';
 import type { ApiConfig, ApiProvider } from '../types';
 import { DEFAULT_REPLICATE_MODEL } from '../api/replicate';
 
@@ -22,6 +22,18 @@ interface ProviderInfo {
 }
 
 const PROVIDERS: ProviderInfo[] = [
+  {
+    id: 'huggingface',
+    name: 'Gratis — TripoSR (HuggingFace)',
+    description: 'Sin API key. Usa TripoSR de Stability AI vía HuggingFace Spaces. Una imagen → modelo 3D OBJ. Sujeto a disponibilidad de GPU.',
+    badge: 'Sin API key',
+    badgeColor: 'bg-green-500/20 text-green-300 border border-green-500/30',
+    features: ['100% gratis', 'Sin registro', 'OBJ descargable', 'Cola pública'],
+    docsUrl: 'https://huggingface.co/spaces/stabilityai/TripoSR',
+    icon: <Sparkles className="w-5 h-5" />,
+    keyLabel: '',
+    keyPlaceholder: '',
+  },
   {
     id: 'replicate',
     name: 'Hunyuan 3D (Replicate)',
@@ -75,7 +87,7 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!apiKey.trim()) {
+    if (provider !== 'huggingface' && !apiKey.trim()) {
       setError('Por favor ingresa tu API key');
       return;
     }
@@ -160,8 +172,8 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
           ))}
         </div>
 
-        {/* API Key input */}
-        <div className="card mt-2">
+        {/* API Key input — hidden for free HuggingFace provider */}
+        <div className={`card mt-2 ${provider === 'huggingface' ? 'hidden' : ''}`}>
           <div className="flex items-center justify-between mb-3">
             <label className="label mb-0">{current.keyLabel}</label>
             <a

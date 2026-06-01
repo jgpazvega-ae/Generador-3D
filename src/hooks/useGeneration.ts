@@ -11,6 +11,7 @@ import { QUALITY_PROFILES } from '../types';
 import { createMeshyTask, pollMeshyTask } from '../api/meshy';
 import { generateStability3D } from '../api/stability';
 import { generateHunyuan3D } from '../api/replicate';
+import { generateWithTripoSR } from '../api/huggingface';
 import {
   compressImageToDataUrl,
   removeImageBackground,
@@ -78,6 +79,8 @@ export function useGeneration() {
             quality,
             onProgress,
           );
+        } else if (config.provider === 'huggingface') {
+          result = await generateWithTripoSR(compressed[0], onProgress);
         } else {
           result = await generateHunyuan3D(
             config.apiKey,

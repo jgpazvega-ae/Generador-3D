@@ -64,7 +64,7 @@ export interface Measurements {
   unit: MeasurementUnit;
 }
 
-export type ApiProvider = 'meshy' | 'stability' | 'replicate';
+export type ApiProvider = 'meshy' | 'stability' | 'replicate' | 'huggingface';
 
 /** Preset de calidad que controla polígonos, pasos de inferencia y resolución de textura */
 export type QualityPreset = 'draft' | 'standard' | 'max';
