@@ -127,28 +127,28 @@ export default function ProcessingStep({ state }: Props) {
 
       {/* Progress bar */}
       <div className="space-y-2">
-        <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+        <div className="relative h-2.5 rounded-full overflow-hidden"
+             style={{ background: 'rgba(255,255,255,0.04)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)' }}>
           <div
             className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, #4338ca, #7c3aed, #6366f1)',
-              boxShadow: '0 0 12px rgba(99,102,241,0.5)',
+              background: 'linear-gradient(90deg, #4338ca 0%, #6366f1 50%, #818cf8 100%)',
+              boxShadow: '0 0 16px rgba(99,102,241,0.6), 0 0 4px rgba(99,102,241,0.8)',
             }}
           />
-          {/* Shimmer overlay */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full"
+            className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)',
               backgroundSize: '200% auto',
-              animation: 'shimmer 2s linear infinite',
+              animation: 'shimmer 1.8s linear infinite',
             }}
           />
         </div>
-        <div className="flex justify-between text-[11px]" style={{ color: 'rgba(71,85,105,0.8)' }}>
-          <span>{progress}% completado</span>
+        <div className="flex justify-between text-[11px]" style={{ color: 'rgba(71,85,105,0.75)' }}>
+          <span className="font-medium" style={{ color: 'rgba(165,180,252,0.6)' }}>{progress}%</span>
           <span>{progress < 100 ? 'No cierres esta página' : '¡Listo!'}</span>
         </div>
       </div>

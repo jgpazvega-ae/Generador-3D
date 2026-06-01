@@ -60,10 +60,36 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse 120% 60% at 30% 10%, rgba(99,102,241,0.06) 0%, transparent 60%), radial-gradient(ellipse 100% 50% at 70% 90%, rgba(139,92,246,0.05) 0%, transparent 60%), #0a0a16' }}>
-      <Header hasConfig={!!apiConfig} onReconfigure={() => setStep('config')} />
+    <div className="min-h-screen relative overflow-hidden" style={{ background: '#080818' }}>
+      {/* Animated background layers */}
+      <div className="fixed inset-0 pointer-events-none" aria-hidden="true">
+        {/* Base gradient */}
+        <div className="absolute inset-0"
+             style={{ background: 'radial-gradient(ellipse 140% 70% at 20% -10%, rgba(99,102,241,0.08) 0%, transparent 55%), radial-gradient(ellipse 100% 60% at 80% 110%, rgba(139,92,246,0.06) 0%, transparent 55%), radial-gradient(ellipse 80% 50% at 50% 50%, rgba(56,189,248,0.02) 0%, transparent 70%)' }} />
+        {/* Animated top glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] animate-glow"
+             style={{
+               background: 'radial-gradient(ellipse, rgba(99,102,241,0.07) 0%, transparent 65%)',
+               filter: 'blur(40px)',
+             }} />
+        {/* Grid overlay */}
+        <div className="absolute inset-0 opacity-[0.025]"
+             style={{
+               backgroundImage: `linear-gradient(rgba(99,102,241,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.5) 1px, transparent 1px)`,
+               backgroundSize: '60px 60px',
+             }} />
+        {/* Floating orbs */}
+        <div className="absolute top-[15%] left-[8%] w-72 h-72 rounded-full animate-float"
+             style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.05) 0%, transparent 65%)', animationDelay: '0s', animationDuration: '8s' }} />
+        <div className="absolute top-[55%] right-[6%] w-56 h-56 rounded-full animate-float"
+             style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.04) 0%, transparent 65%)', animationDelay: '-3s', animationDuration: '10s' }} />
+        <div className="absolute bottom-[10%] left-[30%] w-40 h-40 rounded-full animate-float"
+             style={{ background: 'radial-gradient(circle, rgba(56,189,248,0.03) 0%, transparent 65%)', animationDelay: '-5s', animationDuration: '7s' }} />
+      </div>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 pb-20">
+      <Header hasConfig={!!apiConfig} onReconfigure={() => setStep('config')} provider={apiConfig?.provider} />
+
+      <main className="relative max-w-6xl mx-auto px-4 py-8 pb-20">
         {/* Step indicator */}
         <div className="mb-10">
           <StepIndicator steps={STEP_LABELS} currentIndex={currentIndex} />

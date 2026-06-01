@@ -43,22 +43,33 @@ export default function ResultStep({ result, measurements, images, onStartOver }
     <div className="max-w-6xl mx-auto space-y-5 animate-slide-up">
 
       {/* Success banner */}
-      <div className="relative rounded-2xl px-5 py-4 overflow-hidden"
+      <div className="relative rounded-2xl px-5 py-4 overflow-hidden animate-border-glow"
            style={{
-             background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(5,150,105,0.05) 100%)',
-             border: '1px solid rgba(16,185,129,0.2)',
+             background: 'linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(5,150,105,0.04) 100%)',
+             border: '1px solid rgba(16,185,129,0.22)',
            }}>
+        {/* Shimmer overlay */}
+        <div className="absolute inset-0 pointer-events-none"
+             style={{
+               background: 'linear-gradient(90deg, transparent 0%, rgba(16,185,129,0.03) 50%, transparent 100%)',
+               backgroundSize: '200% auto',
+               animation: 'shimmer 4s linear infinite',
+             }} />
         {/* Left accent */}
-        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
-             style={{ background: 'linear-gradient(180deg, #10b981, #059669)' }} />
-        <div className="flex items-center gap-3 pl-2">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-               style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-2xl"
+             style={{ background: 'linear-gradient(180deg, #34d399, #10b981, #059669)' }} />
+        <div className="flex items-center gap-3 pl-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 animate-pop-in"
+               style={{
+                 background: 'rgba(16,185,129,0.12)',
+                 border: '1px solid rgba(16,185,129,0.25)',
+                 boxShadow: '0 0 20px rgba(16,185,129,0.1)',
+               }}>
             <CheckCircle className="w-5 h-5 text-emerald-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-emerald-300 text-sm">¡Modelo 3D generado exitosamente!</p>
+              <p className="font-bold text-emerald-300 text-sm tracking-tight">¡Modelo 3D generado exitosamente!</p>
               {result.isBlob && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' }}>
@@ -66,31 +77,33 @@ export default function ResultStep({ result, measurements, images, onStartOver }
                 </span>
               )}
             </div>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(100,116,139,0.8)' }}>
-              {result.scaled ? 'Modelo escalado a tus medidas reales. ' : ''}
-              {hasViewer ? 'Rota · Escala · Descarga en el visor de abajo.' : 'Descarga el archivo para verlo en tu software 3D favorito.'}
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(100,116,139,0.75)' }}>
+              {result.scaled ? 'Escalado a medidas reales. ' : ''}
+              {hasViewer ? 'Arrastra para rotar · Scroll para zoom · Descarga abajo.' : 'Descarga el archivo para verlo en tu software 3D.'}
             </p>
           </div>
-          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium rounded-full px-3 py-1.5"
-               style={{ background: 'rgba(16,185,129,0.08)', color: 'rgba(52,211,153,0.8)', border: '1px solid rgba(16,185,129,0.15)' }}>
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1.5"
+               style={{ background: 'rgba(16,185,129,0.08)', color: 'rgba(52,211,153,0.85)', border: '1px solid rgba(16,185,129,0.18)' }}>
             <Sparkles className="w-3 h-3" />
-            IA completó
+            Completado
           </div>
         </div>
       </div>
 
       {/* 3D Viewer */}
       {hasViewer ? (
-        <div className="rounded-2xl overflow-hidden h-[480px] sm:h-[560px] relative"
+        <div className="rounded-2xl overflow-hidden h-[480px] sm:h-[580px] relative"
              style={{
-               background: '#060610',
-               border: '1px solid rgba(99,102,241,0.15)',
-               boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.08)',
+               background: 'linear-gradient(180deg, #07070f 0%, #040408 100%)',
+               border: '1px solid rgba(99,102,241,0.18)',
+               boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.06), 0 0 60px rgba(99,102,241,0.04) inset',
              }}>
-          {/* Corner glow */}
-          <div className="absolute inset-0 pointer-events-none rounded-2xl" style={{
-            background: 'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(99,102,241,0.06) 0%, transparent 60%)',
-          }} />
+          {/* Top glow */}
+          <div className="absolute top-0 inset-x-0 h-32 pointer-events-none"
+               style={{ background: 'radial-gradient(ellipse 70% 100% at 50% 0%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
+          {/* Bottom fade */}
+          <div className="absolute bottom-0 inset-x-0 h-16 pointer-events-none z-10"
+               style={{ background: 'linear-gradient(to top, rgba(4,4,8,0.5) 0%, transparent 100%)' }} />
           <ModelViewerComponent src={result.glbUrl} poster={result.thumbnailUrl} />
         </div>
       ) : (
