@@ -45,6 +45,8 @@ export default function ImageUploadStep({
   const [error, setError] = useState('');
   const [loadingSlot, setLoadingSlot] = useState<string | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const dragCounters = useRef<Record<string, number>>({});
 
   const isSingleView = SINGLE_VIEW_PROVIDERS.includes(provider);
   const slots = isSingleView ? SINGLE_SLOT : MULTI_SLOTS;
@@ -94,6 +96,31 @@ export default function ImageUploadStep({
     onImagesChange(images.filter((i) => i.angle !== angle));
   };
 
+  const handleDragEnter = useCallback((angle: ViewAngle, e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounters.current[angle] = (dragCounters.current[angle] ?? 0) + 1;
+    if (e.dataTransfer.types.includes('Files')) setDragOverSlot(angle);
+  }, []);
+
+  const handleDragLeave = useCallback((angle: ViewAngle, e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounters.current[angle] = Math.max(0, (dragCounters.current[angle] ?? 1) - 1);
+    if (dragCounters.current[angle] === 0) setDragOverSlot(null);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback((angle: ViewAngle, e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounters.current[angle] = 0;
+    setDragOverSlot(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleSlotFile(angle, file);
+  }, [handleSlotFile]);
+
   const canGenerate = images.length > 0;
   const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
 
@@ -122,7 +149,9 @@ export default function ImageUploadStep({
           const img = getImageForAngle(slot.angle);
           const isLoading = loadingSlot === slot.angle;
           const isHovered = hoveredSlot === slot.angle;
+          const isDragOver = dragOverSlot === slot.angle;
           const filled = !!img;
+          const interactive = isHovered || isDragOver;
 
           return (
             <div key={slot.angle} className="flex flex-col gap-2">
@@ -143,24 +172,37 @@ export default function ImageUploadStep({
 
               {/* Slot card */}
               <div
-                className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 ${!filled && slot.required && !isHovered ? 'animate-pulse-soft' : ''}`}
+                className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 ${!filled && slot.required && !interactive ? 'animate-pulse-soft' : ''}`}
                 onClick={() => { if (!isLoading) inputRefs.current[slot.angle]?.click(); }}
                 onMouseEnter={() => setHoveredSlot(slot.angle)}
                 onMouseLeave={() => setHoveredSlot(null)}
+                onDragEnter={(e) => handleDragEnter(slot.angle, e)}
+                onDragLeave={(e) => handleDragLeave(slot.angle, e)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(slot.angle, e)}
                 style={{
-                  background: filled
+                  background: isDragOver
+                    ? 'rgba(99,102,241,0.1)'
+                    : filled
                     ? '#080818'
                     : isHovered
                     ? 'rgba(99,102,241,0.05)'
                     : 'rgba(255,255,255,0.018)',
-                  border: filled
+                  border: isDragOver
+                    ? '2px solid rgba(99,102,241,0.7)'
+                    : filled
                     ? '2px solid rgba(99,102,241,0.35)'
                     : isHovered
                     ? '2px dashed rgba(99,102,241,0.45)'
                     : slot.required
                     ? '2px dashed rgba(99,102,241,0.22)'
                     : '2px dashed rgba(255,255,255,0.07)',
-                  boxShadow: filled ? '0 0 20px rgba(99,102,241,0.08)' : 'none',
+                  boxShadow: isDragOver
+                    ? '0 0 28px rgba(99,102,241,0.2), inset 0 0 20px rgba(99,102,241,0.05)'
+                    : filled
+                    ? '0 0 20px rgba(99,102,241,0.08)'
+                    : 'none',
+                  transform: isDragOver ? 'scale(1.03)' : 'scale(1)',
                   transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
                 }}
               >
@@ -198,16 +240,18 @@ export default function ImageUploadStep({
                       <X className="w-3.5 h-3.5 text-white" />
                     </button>
 
-                    {/* Hover overlay with change prompt */}
+                    {/* Hover / drag-over overlay */}
                     <div
                       className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 transition-all duration-250"
-                      style={{ opacity: isHovered ? 1 : 0, background: 'rgba(0,0,0,0.4)' }}
+                      style={{ opacity: interactive ? 1 : 0, background: isDragOver ? 'rgba(99,102,241,0.25)' : 'rgba(0,0,0,0.4)' }}
                     >
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center"
                            style={{ background: 'rgba(99,102,241,0.3)', backdropFilter: 'blur(4px)' }}>
-                        <Upload className="w-4 h-4 text-white" />
+                        <Upload className={`w-4 h-4 text-white ${isDragOver ? 'animate-bounce' : ''}`} />
                       </div>
-                      <span className="text-[11px] font-medium text-white">Cambiar foto</span>
+                      <span className="text-[11px] font-medium text-white">
+                        {isDragOver ? 'Suelta aquí' : 'Cambiar foto'}
+                      </span>
                     </div>
 
                     {/* Bottom angle label */}
@@ -224,16 +268,20 @@ export default function ImageUploadStep({
                     <div
                       className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300"
                       style={{
-                        background: isHovered ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.06)',
-                        border: `1px solid ${isHovered ? 'rgba(99,102,241,0.4)' : 'rgba(99,102,241,0.12)'}`,
+                        background: isDragOver ? 'rgba(99,102,241,0.25)' : isHovered ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.06)',
+                        border: `1px solid ${isDragOver ? 'rgba(99,102,241,0.7)' : isHovered ? 'rgba(99,102,241,0.4)' : 'rgba(99,102,241,0.12)'}`,
+                        transform: isDragOver ? 'scale(1.1)' : 'scale(1)',
                       }}
                     >
-                      <Plus className="w-6 h-6 transition-all duration-300"
-                            style={{ color: isHovered ? '#a5b4fc' : 'rgba(99,102,241,0.5)' }} />
+                      {isDragOver
+                        ? <Upload className="w-6 h-6 text-indigo-300 animate-bounce" />
+                        : <Plus className="w-6 h-6 transition-all duration-300"
+                                style={{ color: isHovered ? '#a5b4fc' : 'rgba(99,102,241,0.5)' }} />
+                      }
                     </div>
-                    <span className="text-[11px] text-center leading-relaxed"
-                          style={{ color: isHovered ? 'rgba(165,180,252,0.7)' : 'rgba(71,85,105,0.8)' }}>
-                      {slot.hint}
+                    <span className="text-[11px] text-center leading-relaxed font-medium"
+                          style={{ color: isDragOver ? 'rgba(165,180,252,0.9)' : isHovered ? 'rgba(165,180,252,0.7)' : 'rgba(71,85,105,0.8)' }}>
+                      {isDragOver ? 'Suelta aquí' : slot.hint}
                     </span>
                   </div>
                 )}
