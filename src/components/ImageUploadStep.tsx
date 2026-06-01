@@ -43,7 +43,7 @@ export default function ImageUploadStep({
 }: Props) {
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [error, setError] = useState('');
-  const [loadingSlot, setLoadingSlot] = useState<string | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState<Set<string>>(new Set());
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [globalDragActive, setGlobalDragActive] = useState(false);
@@ -62,7 +62,7 @@ export default function ImageUploadStep({
       const validationError = validateImageFile(file);
       if (validationError) { setError(validationError); return; }
 
-      setLoadingSlot(angle);
+      setLoadingSlots((s) => new Set([...s, angle]));
       setError('');
 
       const existing = images.find((i) => i.angle === angle);
@@ -87,7 +87,7 @@ export default function ImageUploadStep({
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
       });
       onImagesChange(updated);
-      setLoadingSlot(null);
+      setLoadingSlots((s) => { const n = new Set(s); n.delete(angle); return n; });
       setJustFilledSlot(angle);
       setTimeout(() => setJustFilledSlot(null), 900);
     },
@@ -103,8 +103,7 @@ export default function ImageUploadStep({
       if (count === 1) { handleSlotFile(targets[0].angle, files[0]); return; }
 
       setError('');
-      const firstAngle = targets[0].angle;
-      setLoadingSlot(firstAngle);
+      setLoadingSlots(new Set(targets.slice(0, count).map((t) => t.angle)));
 
       // Compress all files in parallel
       const prepared = await Promise.all(
@@ -129,7 +128,7 @@ export default function ImageUploadStep({
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
       });
       onImagesChange(next);
-      setLoadingSlot(null);
+      setLoadingSlots(new Set());
       // Flash all newly filled slots
       for (const p of prepared) {
         setJustFilledSlot(p.angle);
@@ -286,7 +285,7 @@ export default function ImageUploadStep({
       <div className={`grid gap-4 ${isSingleView ? 'max-w-xs mx-auto' : 'grid-cols-2 sm:grid-cols-4'}`}>
         {slots.map((slot) => {
           const img = getImageForAngle(slot.angle);
-          const isLoading = loadingSlot === slot.angle;
+          const isLoading = loadingSlots.has(slot.angle);
           const isHovered = hoveredSlot === slot.angle;
           const isDragOver = dragOverSlot === slot.angle;
           const isNextTarget = globalDragActive && !dragOverSlot && !img && slot.angle === nextEmptySlot?.angle;
