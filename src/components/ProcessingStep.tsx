@@ -122,9 +122,13 @@ export default function ProcessingStep({ state, images = [], onCancel }: Props) 
            style={{ color: 'rgba(165,180,252,0.9)' }}>
           {state.message || 'Procesando…'}
         </p>
-        <p className="text-xs" style={{ color: 'rgba(71,85,105,0.65)' }}>
-          Tiempo transcurrido: <span className="font-mono">{elapsedStr}</span>
-        </p>
+        <div className="flex items-center justify-center gap-4 text-[11px]">
+          <span style={{ color: 'rgba(71,85,105,0.65)' }}>
+            Tiempo: <span className="font-mono font-semibold" style={{ color: 'rgba(100,116,139,0.8)' }}>{elapsedStr}</span>
+          </span>
+          <span style={{ color: 'rgba(51,65,85,0.5)' }}>·</span>
+          <span style={{ color: 'rgba(71,85,105,0.6)' }}>Mantén la pestaña abierta</span>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -149,7 +153,7 @@ export default function ProcessingStep({ state, images = [], onCancel }: Props) 
         </div>
         <div className="flex justify-between text-[11px]">
           <span className="font-semibold" style={{ color: 'rgba(165,180,252,0.65)' }}>{progress}%</span>
-          <span style={{ color: 'rgba(71,85,105,0.7)' }}>{progress < 100 ? 'No cierres esta página' : '¡Listo!'}</span>
+          <span style={{ color: 'rgba(71,85,105,0.7)' }}>{progress < 100 ? 'Procesando en la nube…' : '¡Listo!'}</span>
         </div>
       </div>
 
