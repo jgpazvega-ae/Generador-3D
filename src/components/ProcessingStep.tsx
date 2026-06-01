@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
-import type { GenerationState, UploadedImage } from '../types';
+import { X, AlertCircle } from 'lucide-react';
+import type { ApiProvider, GenerationState, UploadedImage } from '../types';
 
 interface Props {
   state: GenerationState;
   images?: UploadedImage[];
+  provider?: ApiProvider;
   onCancel?: () => void;
 }
 
@@ -25,7 +26,20 @@ const STAGE_LABELS = [
   { label: 'Finalizando', threshold: 95 },
 ];
 
-export default function ProcessingStep({ state, images = [], onCancel }: Props) {
+const PROVIDER_HINTS: Partial<Record<ApiProvider, { title: string; body: string; color: string }>> = {
+  huggingface: {
+    title: 'El espacio de HuggingFace puede tardar 2–3 min en iniciarse',
+    body: 'TripoSR corre en una GPU pública compartida. Si está inactiva, el servidor tarda en arrancar antes de procesar tu imagen. Es normal — no es un error.',
+    color: 'rgba(245,158,11,0.08)',
+  },
+  replicate: {
+    title: 'Hunyuan 3D suele tardar 2–5 minutos',
+    body: 'El modelo reconstruye geometría compleja desde múltiples ángulos. La primera ejecución puede arrancar un contenedor nuevo en Replicate.',
+    color: 'rgba(99,102,241,0.07)',
+  },
+};
+
+export default function ProcessingStep({ state, images = [], provider, onCancel }: Props) {
   const [tipIdx, setTipIdx] = useState(0);
   const [tipVisible, setTipVisible] = useState(true);
   const [tick, setTick] = useState(0);
@@ -238,6 +252,24 @@ export default function ProcessingStep({ state, images = [], onCancel }: Props) 
             <X className="w-3.5 h-3.5" />
             Cancelar y volver
           </button>
+        </div>
+      )}
+
+      {/* Provider-specific hint */}
+      {provider && PROVIDER_HINTS[provider] && tick < 30 && (
+        <div className="rounded-2xl overflow-hidden animate-slide-up"
+             style={{ background: PROVIDER_HINTS[provider]!.color, border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-start gap-3 p-4">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'rgba(253,230,138,0.7)' }} />
+            <div>
+              <p className="text-[12px] font-semibold mb-1" style={{ color: 'rgba(253,230,138,0.85)' }}>
+                {PROVIDER_HINTS[provider]!.title}
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.7)' }}>
+                {PROVIDER_HINTS[provider]!.body}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

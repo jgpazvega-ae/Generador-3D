@@ -117,6 +117,7 @@ export default function App() {
           <ProcessingStep
             state={gen}
             images={images}
+            provider={apiConfig?.provider}
             onCancel={() => { cancel(); setStep('upload'); }}
           />
         )}
