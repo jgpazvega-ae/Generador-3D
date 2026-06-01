@@ -1,0 +1,19 @@
+{
+  "name": "generador-3d-proxy",
+  "version": "1.0.0",
+  "description": "Proxy server for Generador 3D — keeps API keys server-side",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1"
+  }
+}

@@ -1,6 +1,14 @@
 import type { UploadedImage, ModelResult, QualityProfile } from '../types';
 
-const BASE = 'https://api.replicate.com/v1';
+const REPLICATE_DIRECT = 'https://api.replicate.com/v1';
+
+function replicateBase(proxyUrl?: string) {
+  return proxyUrl ? `${proxyUrl}/proxy/replicate` : REPLICATE_DIRECT;
+}
+
+function authHeader(apiKey: string, proxyUrl?: string): Record<string, string> {
+  return proxyUrl ? {} : { Authorization: `Token ${apiKey}` };
+}
 
 // Modelo single-image por defecto (Hunyuan 3D 2 de Tencent)
 export const DEFAULT_REPLICATE_MODEL = 'tencent/hunyuan3d-2';
@@ -19,7 +27,9 @@ async function createPrediction(
   apiKey: string,
   modelVersion: string,
   input: Record<string, unknown>,
+  proxyUrl?: string,
 ): Promise<string> {
+  const BASE = replicateBase(proxyUrl);
   const [modelPath, version] = modelVersion.split(':');
   const [owner, model] = modelPath.split('/');
 
@@ -34,7 +44,7 @@ async function createPrediction(
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
-      Authorization: `Token ${apiKey}`,
+      ...authHeader(apiKey, proxyUrl),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -43,7 +53,9 @@ async function createPrediction(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(
-      (err as { detail?: string }).detail ?? `Replicate error ${res.status}`,
+      (err as { detail?: string; error?: string }).detail ??
+      (err as { error?: string }).error ??
+      `Replicate error ${res.status}`,
     );
   }
 
@@ -54,9 +66,11 @@ async function createPrediction(
 async function getPrediction(
   apiKey: string,
   predictionId: string,
+  proxyUrl?: string,
 ): Promise<ReplicatePrediction> {
+  const BASE = replicateBase(proxyUrl);
   const res = await fetch(`${BASE}/predictions/${predictionId}`, {
-    headers: { Authorization: `Token ${apiKey}` },
+    headers: authHeader(apiKey, proxyUrl),
   });
   if (!res.ok) throw new Error(`Error al consultar predicción: ${res.status}`);
   return res.json();
@@ -68,6 +82,7 @@ export async function generateHunyuan3D(
   quality: QualityProfile,
   onProgress: (progress: number, message: string) => void,
   userModel?: string,
+  proxyUrl?: string,
 ): Promise<ModelResult> {
   const multiview = images.length > 1;
   const byAngle = (a: string) => images.find((i) => i.angle === a)?.dataUrl;
@@ -104,14 +119,14 @@ export async function generateHunyuan3D(
   }
 
   onProgress(8, `Enviando a Replicate (${modelVersion.split('/')[1] ?? modelVersion})...`);
-  const predictionId = await createPrediction(apiKey, modelVersion, input);
+  const predictionId = await createPrediction(apiKey, modelVersion, input, proxyUrl);
 
   const start = Date.now();
   const deadline = start + 600000;
   let dots = 0;
 
   while (Date.now() < deadline) {
-    const prediction = await getPrediction(apiKey, predictionId);
+    const prediction = await getPrediction(apiKey, predictionId, proxyUrl);
 
     if (prediction.status === 'succeeded' && prediction.output) {
       const output = Array.isArray(prediction.output)

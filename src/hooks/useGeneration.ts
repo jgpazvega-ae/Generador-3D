@@ -63,23 +63,30 @@ export function useGeneration() {
         );
 
         // 2. Generación según proveedor
+        const proxy = config.proxyUrl?.trim() || undefined;
+        const sharedProvider = config.sharedProvider ?? 'replicate';
+        const effectiveProvider =
+          config.provider === 'shared' ? sharedProvider : config.provider;
+
         let result: ModelResult;
-        if (config.provider === 'meshy') {
+        if (effectiveProvider === 'meshy') {
           onProgress(8, 'Creando tarea en Meshy AI...');
           const { taskId, endpoint } = await createMeshyTask(
             config.apiKey,
             compressed,
             quality,
+            proxy,
           );
-          result = await pollMeshyTask(config.apiKey, taskId, endpoint, onProgress);
-        } else if (config.provider === 'stability') {
+          result = await pollMeshyTask(config.apiKey, taskId, endpoint, onProgress, 4000, 600000, proxy);
+        } else if (effectiveProvider === 'stability') {
           result = await generateStability3D(
             config.apiKey,
             compressed[0],
             quality,
             onProgress,
+            proxy,
           );
-        } else if (config.provider === 'huggingface') {
+        } else if (effectiveProvider === 'huggingface') {
           result = await generateWithTripoSR(compressed[0], onProgress);
         } else {
           result = await generateHunyuan3D(
@@ -88,6 +95,7 @@ export function useGeneration() {
             quality,
             onProgress,
             config.replicateModel,
+            proxy,
           );
         }
 
