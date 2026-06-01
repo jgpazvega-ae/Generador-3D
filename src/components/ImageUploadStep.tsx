@@ -124,9 +124,16 @@ export default function ImageUploadStep({
     setDragOverSlot(null);
     globalDragCounter.current = 0;
     setGlobalDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleSlotFile(angle, file);
-  }, [handleSlotFile]);
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+    // Distribute multiple dropped files to empty slots starting from this one
+    const startIdx = slots.findIndex((s) => s.angle === angle);
+    const targets = slots.slice(startIdx).filter((s) => !images.find((img) => img.angle === s.angle));
+    files.forEach((f, i) => {
+      const target = targets[i];
+      if (target) handleSlotFile(target.angle, f);
+    });
+  }, [handleSlotFile, slots, images]);
 
   const handleGlobalDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -145,11 +152,13 @@ export default function ImageUploadStep({
     globalDragCounter.current = 0;
     setGlobalDragActive(false);
     setDragOverSlot(null);
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    // Auto-assign to next empty slot
-    const nextEmpty = slots.find((s) => !images.find((img) => img.angle === s.angle));
-    if (nextEmpty) handleSlotFile(nextEmpty.angle, file);
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+    // Distribute multiple files to empty slots in order
+    const emptySlots = slots.filter((s) => !images.find((img) => img.angle === s.angle));
+    files.forEach((f, i) => {
+      if (emptySlots[i]) handleSlotFile(emptySlots[i].angle, f);
+    });
   }, [slots, images, handleSlotFile]);
 
   const nextEmptySlot = slots.find((s) => !images.find((img) => img.angle === s.angle));
@@ -200,9 +209,14 @@ export default function ImageUploadStep({
             <p className="text-lg font-bold text-white">Suelta la imagen</p>
             <p className="text-sm" style={{ color: 'rgba(165,180,252,0.7)' }}>
               {nextEmptySlot
-                ? `→ Se añadirá a: ${nextEmptySlot.label}`
+                ? `→ Primera vacía: ${nextEmptySlot.label}`
                 : 'Todas las posiciones están llenas'}
             </p>
+            {nextEmptySlot && !isSingleView && (
+              <p className="text-[11px]" style={{ color: 'rgba(99,102,241,0.5)' }}>
+                Múltiples archivos se distribuyen automáticamente
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -309,12 +323,19 @@ export default function ImageUploadStep({
                   ref={(el) => { inputRefs.current[slot.angle] = el; }}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    if (e.target.files?.[0]) {
-                      handleSlotFile(slot.angle, e.target.files[0]);
-                      e.target.value = '';
-                    }
+                    const files = Array.from(e.target.files ?? []);
+                    if (!files.length) return;
+                    // Single file → fill this slot; multiple files → distribute to empty slots starting here
+                    const startIdx = slots.findIndex((s) => s.angle === slot.angle);
+                    const targets = slots.slice(startIdx).filter((s) => !images.find((img) => img.angle === s.angle));
+                    files.forEach((f, i) => {
+                      const target = targets[i];
+                      if (target) handleSlotFile(target.angle, f);
+                    });
+                    e.target.value = '';
                   }}
                 />
 
