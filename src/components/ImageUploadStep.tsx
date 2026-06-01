@@ -74,7 +74,15 @@ export default function ImageUploadStep({
         angle,
       };
 
-      onImagesChange([...images.filter((i) => i.angle !== angle), newImg]);
+      // Keep images ordered by slot order so front is always first in the array
+      const slotOrder = slots.map((s) => s.angle);
+      const updated = [...images.filter((i) => i.angle !== angle), newImg];
+      updated.sort((a, b) => {
+        const ai = slotOrder.indexOf(a.angle);
+        const bi = slotOrder.indexOf(b.angle);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+      onImagesChange(updated);
       setLoadingSlot(null);
     },
     [images, onImagesChange],

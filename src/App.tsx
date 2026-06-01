@@ -127,29 +127,54 @@ export default function App() {
         )}
 
         {step === 'result' && gen.status === 'failed' && (
-          <div className="max-w-md mx-auto text-center py-16 space-y-6 animate-slide-up">
+          <div className="max-w-md mx-auto text-center py-12 space-y-6 animate-slide-up">
+            {/* Error icon */}
             <div className="relative mx-auto w-fit">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto"
-                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div className="absolute inset-0 rounded-2xl blur-xl opacity-40"
+                   style={{ background: 'rgba(239,68,68,0.3)' }} />
+              <div className="relative w-20 h-20 rounded-2xl flex items-center justify-center mx-auto"
+                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <AlertCircle className="w-10 h-10" style={{ color: 'rgba(248,113,113,0.9)' }} />
               </div>
             </div>
+
+            {/* Message */}
             <div>
-              <h2 className="text-2xl font-bold text-white mb-3">Error al generar</h2>
-              <p className="text-sm leading-relaxed rounded-xl px-5 py-4 mx-auto"
-                 style={{
-                   color: 'rgba(148,163,184,0.8)',
-                   background: 'rgba(255,255,255,0.02)',
-                   border: '1px solid rgba(255,255,255,0.06)',
-                 }}>
-                {gen.error}
+              <h2 className="text-2xl font-bold text-white mb-2">Error al generar</h2>
+              <p className="text-sm mb-4" style={{ color: 'rgba(100,116,139,0.8)' }}>
+                El modelo no pudo generarse. Detalles:
               </p>
+              <div className="rounded-xl px-4 py-3 text-left"
+                   style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <p className="text-sm font-mono leading-relaxed break-words"
+                   style={{ color: 'rgba(252,165,165,0.85)' }}>
+                  {gen.error}
+                </p>
+              </div>
             </div>
+
+            {/* Tips based on error */}
+            <div className="text-left rounded-xl px-4 py-3 space-y-1.5"
+                 style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'rgba(165,180,252,0.7)' }}>
+                Qué puedes intentar:
+              </p>
+              {[
+                'Verifica que tu API key sea correcta',
+                'Asegúrate de que la imagen tiene buena iluminación y fondo liso',
+                'Prueba con TripoSR (gratis, sin API key)',
+                'Si usas Replicate, comprueba que tienes créditos disponibles',
+              ].map((tip) => (
+                <p key={tip} className="text-xs flex items-start gap-2"
+                   style={{ color: 'rgba(100,116,139,0.8)' }}>
+                  <span className="text-indigo-400 mt-0.5">›</span>
+                  {tip}
+                </p>
+              ))}
+            </div>
+
             <div className="flex gap-3 justify-center">
-              <button
-                onClick={handleStartOver}
-                className="btn-primary flex items-center gap-2"
-              >
+              <button onClick={handleStartOver} className="btn-primary flex items-center gap-2">
                 <RotateCcw className="w-4 h-4" />
                 Intentar de nuevo
               </button>

@@ -88,6 +88,10 @@ export function useGeneration() {
           const effectiveProvider =
             config.provider === 'shared' ? sharedProvider : config.provider;
 
+          // For single-view providers always use the 'front' angle image (or first if absent)
+          const frontImage =
+            compressed.find((img) => img.angle === 'front') ?? compressed[0];
+
           let result: ModelResult;
           if (effectiveProvider === 'meshy') {
             onProgress(8, 'Creando tarea en Meshy AI...');
@@ -101,13 +105,13 @@ export function useGeneration() {
           } else if (effectiveProvider === 'stability') {
             result = await generateStability3D(
               config.apiKey,
-              compressed[0],
+              frontImage,
               quality,
               onProgress,
               proxy,
             );
           } else if (effectiveProvider === 'huggingface') {
-            result = await generateWithTripoSR(compressed[0], onProgress);
+            result = await generateWithTripoSR(frontImage, onProgress);
           } else {
             result = await generateHunyuan3D(
               config.apiKey,
