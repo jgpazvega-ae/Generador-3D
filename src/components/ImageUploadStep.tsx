@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Upload, X, Camera, Wand2, ChevronLeft, AlertCircle, Plus } from 'lucide-react';
+import { Upload, X, Camera, Wand2, ChevronLeft, AlertCircle, Plus, CheckCircle2, Sparkles } from 'lucide-react';
 import type { UploadedImage, ViewAngle, Measurements, ApiProvider, GenerationSettings } from '../types';
 import { createObjectUrl, validateImageFile, compressImageToDataUrl } from '../utils/imageUtils';
 import MeasurementsPanel from './MeasurementsPanel';
@@ -143,7 +143,7 @@ export default function ImageUploadStep({
 
               {/* Slot card */}
               <div
-                className="relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-300"
+                className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 ${!filled && slot.required && !isHovered ? 'animate-pulse-soft' : ''}`}
                 onClick={() => { if (!isLoading) inputRefs.current[slot.angle]?.click(); }}
                 onMouseEnter={() => setHoveredSlot(slot.angle)}
                 onMouseLeave={() => setHoveredSlot(null)}
@@ -157,6 +157,8 @@ export default function ImageUploadStep({
                     ? '2px solid rgba(99,102,241,0.35)'
                     : isHovered
                     ? '2px dashed rgba(99,102,241,0.45)'
+                    : slot.required
+                    ? '2px dashed rgba(99,102,241,0.22)'
                     : '2px dashed rgba(255,255,255,0.07)',
                   boxShadow: filled ? '0 0 20px rgba(99,102,241,0.08)' : 'none',
                   transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
@@ -306,6 +308,60 @@ export default function ImageUploadStep({
 
       {/* Measurements */}
       <MeasurementsPanel value={measurements} onChange={onMeasurementsChange} />
+
+      {/* Ready summary */}
+      {filledCount > 0 && (
+        <div
+          className="rounded-2xl overflow-hidden animate-slide-up"
+          style={{
+            background: 'rgba(99,102,241,0.04)',
+            border: '1px solid rgba(99,102,241,0.18)',
+          }}
+        >
+          <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#6ee7b7' }} />
+            <span className="text-xs font-semibold" style={{ color: 'rgba(167,243,208,0.9)' }}>
+              {filledCount === 1 ? '1 foto lista' : `${filledCount} fotos listas`} para generar
+            </span>
+            <Sparkles className="w-3.5 h-3.5 ml-auto flex-shrink-0" style={{ color: 'rgba(99,102,241,0.6)' }} />
+          </div>
+          <div className="flex gap-2 px-4 pb-3 overflow-x-auto">
+            {slots.map((slot) => {
+              const img = getImageForAngle(slot.angle);
+              return (
+                <div key={slot.angle} className="flex-shrink-0 flex flex-col items-center gap-1">
+                  <div
+                    className="relative w-14 h-14 rounded-xl overflow-hidden"
+                    style={{
+                      border: img
+                        ? '1.5px solid rgba(99,102,241,0.4)'
+                        : '1.5px dashed rgba(255,255,255,0.07)',
+                      background: 'rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {img ? (
+                      <>
+                        <img src={img.preview} alt={slot.label} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                             style={{ background: 'rgba(16,185,129,0.9)' }}>
+                          <CheckCircle2 className="w-3 h-3 text-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-[10px]" style={{ color: 'rgba(71,85,105,0.5)' }}>—</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px]" style={{ color: img ? 'rgba(165,180,252,0.7)' : 'rgba(71,85,105,0.5)' }}>
+                    {slot.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3">
