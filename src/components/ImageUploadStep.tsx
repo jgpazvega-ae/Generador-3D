@@ -199,6 +199,21 @@ export default function ImageUploadStep({
   }, [slots, images, handleMultipleFiles]);
 
   const nextEmptySlot = slots.find((s) => !images.find((img) => img.angle === s.angle));
+  const canGenerate = images.length > 0;
+  const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
+
+  // Enter key shortcut to generate when images are ready
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (e.key === 'Enter' && tag !== 'INPUT' && tag !== 'TEXTAREA' && canGenerate) {
+        e.preventDefault();
+        onGenerate();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canGenerate, onGenerate]);
 
   // Clipboard paste: Ctrl+V / Cmd+V pastes into the next empty slot
   useEffect(() => {
@@ -220,9 +235,6 @@ export default function ImageUploadStep({
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   const pasteKey = isMac ? '⌘V' : 'Ctrl+V';
-
-  const canGenerate = images.length > 0;
-  const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
 
   return (
     <div
@@ -275,12 +287,22 @@ export default function ImageUploadStep({
             ? 'Sube la mejor foto del objeto. Fondo liso, buena iluminación.'
             : 'Sube hasta 4 ángulos del mismo objeto para máxima calidad y precisión.'}
         </p>
-        <p className="text-[11px] mt-1.5 flex items-center justify-center gap-3"
+        <p className="text-[11px] mt-1.5 flex items-center justify-center gap-3 transition-all duration-500"
            style={{ color: 'rgba(71,85,105,0.6)' }}>
-          <span>Clic · Arrastra · <kbd className="px-1 py-0.5 rounded text-[10px]"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            {pasteKey}
-          </kbd> Pegar</span>
+          {canGenerate ? (
+            <span className="flex items-center gap-1.5" style={{ color: 'rgba(165,180,252,0.6)' }}>
+              <kbd className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                   style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: 'rgba(165,180,252,0.9)' }}>
+                Enter
+              </kbd>
+              para generar
+            </span>
+          ) : (
+            <span>Toca · Arrastra · <kbd className="px-1 py-0.5 rounded text-[10px]"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {pasteKey}
+            </kbd> Pegar</span>
+          )}
         </p>
 
         {/* Single-view provider notice with upgrade path */}
@@ -455,16 +477,16 @@ export default function ImageUploadStep({
                                 style={{ color: isHovered ? '#a5b4fc' : 'rgba(99,102,241,0.5)' }} />
                       }
                     </div>
-                    <span className="text-[10px] text-center leading-relaxed font-medium"
-                          style={{ color: isDragOver ? 'rgba(165,180,252,0.9)' : isHovered ? 'rgba(165,180,252,0.7)' : 'rgba(71,85,105,0.8)' }}>
-                      {isDragOver ? 'Suelta aquí' : isHovered ? 'Clic o arrastra' : slot.hint}
-                    </span>
-                    {!isHovered && !isDragOver && slot.angle === nextEmptySlot?.angle && (
-                      <span className="text-[9px] font-medium"
-                            style={{ color: 'rgba(99,102,241,0.45)' }}>
-                        {pasteKey} para pegar
+                    <div className="text-center space-y-0.5">
+                      <span className="block text-[10px] leading-relaxed font-medium"
+                            style={{ color: isDragOver ? 'rgba(165,180,252,0.9)' : isHovered ? 'rgba(165,180,252,0.7)' : 'rgba(100,116,139,0.8)' }}>
+                        {isDragOver ? 'Suelta aquí' : isHovered ? 'Clic o arrastra' : slot.hint}
                       </span>
-                    )}
+                      <span className="block text-[9px] font-medium"
+                            style={{ color: isDragOver || isHovered ? 'transparent' : 'rgba(71,85,105,0.55)' }}>
+                        {slot.angle === nextEmptySlot?.angle ? 'Toca o arrastra' : 'Opcional'}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -602,7 +624,7 @@ export default function ImageUploadStep({
         <button
           onClick={onGenerate}
           disabled={!canGenerate}
-          className="btn-primary flex-1 flex items-center justify-center gap-2 py-4 text-base disabled:opacity-40"
+          className={`btn-primary flex-1 flex items-center justify-center gap-2 py-4 text-base disabled:opacity-40 ${canGenerate ? 'animate-border-glow' : ''}`}
         >
           <Wand2 className="w-5 h-5" />
           Generar modelo 3D
