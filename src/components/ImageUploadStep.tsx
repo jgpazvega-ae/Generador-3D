@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Upload, X, Camera, Wand2, ChevronLeft, AlertCircle, Plus, CheckCircle2, Sparkles } from 'lucide-react';
 import type { UploadedImage, ViewAngle, Measurements, ApiProvider, GenerationSettings } from '../types';
 import { createObjectUrl, validateImageFile, compressImageToDataUrl } from '../utils/imageUtils';
@@ -154,6 +154,24 @@ export default function ImageUploadStep({
 
   const nextEmptySlot = slots.find((s) => !images.find((img) => img.angle === s.angle));
 
+  // Clipboard paste: Ctrl+V / Cmd+V pastes into the next empty slot
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imageItem = items.find((i) => i.type.startsWith('image/'));
+      if (!imageItem) return;
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      const target = slots.find((s) => !images.find((img) => img.angle === s.angle));
+      if (target) {
+        e.preventDefault();
+        handleSlotFile(target.angle, file);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [slots, images, handleSlotFile]);
+
   const canGenerate = images.length > 0;
   const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
 
@@ -202,6 +220,13 @@ export default function ImageUploadStep({
           {isSingleView
             ? 'Sube la mejor foto del objeto. Fondo liso, buena iluminación.'
             : 'Sube hasta 4 ángulos del mismo objeto para máxima calidad y precisión.'}
+        </p>
+        <p className="text-[11px] mt-1.5 flex items-center justify-center gap-3"
+           style={{ color: 'rgba(71,85,105,0.6)' }}>
+          <span>Clic · Arrastra · <kbd className="px-1 py-0.5 rounded text-[10px]"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            ⌘V
+          </kbd> Pegar</span>
         </p>
       </div>
 
@@ -353,10 +378,16 @@ export default function ImageUploadStep({
                                 style={{ color: isHovered ? '#a5b4fc' : 'rgba(99,102,241,0.5)' }} />
                       }
                     </div>
-                    <span className="text-[11px] text-center leading-relaxed font-medium"
+                    <span className="text-[10px] text-center leading-relaxed font-medium"
                           style={{ color: isDragOver ? 'rgba(165,180,252,0.9)' : isHovered ? 'rgba(165,180,252,0.7)' : 'rgba(71,85,105,0.8)' }}>
-                      {isDragOver ? 'Suelta aquí' : slot.hint}
+                      {isDragOver ? 'Suelta aquí' : isHovered ? 'Clic o arrastra' : slot.hint}
                     </span>
+                    {!isHovered && !isDragOver && slot.angle === nextEmptySlot?.angle && (
+                      <span className="text-[9px] font-medium"
+                            style={{ color: 'rgba(99,102,241,0.45)' }}>
+                        ⌘V para pegar
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
