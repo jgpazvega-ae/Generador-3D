@@ -204,8 +204,9 @@ export async function generateWithTripoSR(
   const [preprocessed] = await callGradio('preprocess', [uploaded, true, 0.85], onProgress, 10, 30);
   if (preprocessed == null) throw new Error('Preprocesado falló — imagen no aceptada');
 
-  onProgress(35, 'Generando modelo 3D (puede tardar 1–3 min)...');
-  const genOut = await callGradio('generate', [preprocessed, 256], onProgress, 35, 92);
+  // Marching-cubes resolution: 320 is the space's maximum — best geometry detail.
+  onProgress(35, 'Generando modelo 3D en alta resolución (puede tardar 1–3 min)...');
+  const genOut = await callGradio('generate', [preprocessed, 320], onProgress, 35, 92);
 
   onProgress(93, 'Descargando modelo 3D...');
 
