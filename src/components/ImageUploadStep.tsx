@@ -29,6 +29,7 @@ const MAX_IMAGES: Record<ApiProvider, number> = {
   meshy: 4,
   stability: 1,
   huggingface: 1,
+  shared: 4,
 };
 
 const ANGLES: ViewAngle[] = ['front', 'back', 'left', 'right', 'top', 'bottom', 'diagonal', 'custom'];

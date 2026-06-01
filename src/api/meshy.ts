@@ -1,7 +1,15 @@
 import type { UploadedImage, ModelResult, QualityProfile } from '../types';
 
 // API actual de Meshy (openapi v1). El antiguo /v2/ está obsoleto.
-const BASE = 'https://api.meshy.ai/openapi/v1';
+const MESHY_DIRECT = 'https://api.meshy.ai/openapi/v1';
+
+function meshyBase(proxyUrl?: string) {
+  return proxyUrl ? `${proxyUrl}/proxy/meshy` : MESHY_DIRECT;
+}
+
+function meshyAuth(apiKey: string, proxyUrl?: string): Record<string, string> {
+  return proxyUrl ? {} : { Authorization: `Bearer ${apiKey}` };
+}
 
 interface MeshyTaskResponse {
   id: string;
@@ -27,7 +35,9 @@ export async function createMeshyTask(
   apiKey: string,
   images: UploadedImage[],
   quality: QualityProfile,
+  proxyUrl?: string,
 ): Promise<{ taskId: string; endpoint: string }> {
+  const BASE = meshyBase(proxyUrl);
   const multi = images.length > 1;
   const endpoint = multi ? 'multi-image-to-3d' : 'image-to-3d';
 
@@ -49,7 +59,7 @@ export async function createMeshyTask(
   const res = await fetch(`${BASE}/${endpoint}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...meshyAuth(apiKey, proxyUrl),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -71,12 +81,14 @@ export async function pollMeshyTask(
   onProgress: (progress: number, message: string) => void,
   intervalMs = 4000,
   timeoutMs = 600000,
+  proxyUrl?: string,
 ): Promise<ModelResult> {
+  const BASE = meshyBase(proxyUrl);
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     const res = await fetch(`${BASE}/${endpoint}/${taskId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: meshyAuth(apiKey, proxyUrl),
     });
     if (!res.ok) throw new Error(`Error al consultar tarea: ${res.status}`);
 

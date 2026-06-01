@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star, Sparkles, Server } from 'lucide-react';
 import type { ApiConfig, ApiProvider } from '../types';
 import { DEFAULT_REPLICATE_MODEL } from '../api/replicate';
 
@@ -19,6 +19,8 @@ interface ProviderInfo {
   icon: React.ReactNode;
   keyLabel: string;
   keyPlaceholder: string;
+  noKey?: boolean;
+  isShared?: boolean;
 }
 
 const PROVIDERS: ProviderInfo[] = [
@@ -33,6 +35,20 @@ const PROVIDERS: ProviderInfo[] = [
     icon: <Sparkles className="w-5 h-5" />,
     keyLabel: '',
     keyPlaceholder: '',
+    noKey: true,
+  },
+  {
+    id: 'shared',
+    name: 'Servidor propio (sin API key)',
+    description: 'Conecta tu propio servidor proxy. Los usuarios no necesitan API key — la guarda el servidor. Despliega gratis en Render.com.',
+    badge: 'Recomendado para producción',
+    badgeColor: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
+    features: ['Sin key para usuarios', 'Tú controlas los costos', 'Rate limiting', 'Gratis hospedar'],
+    docsUrl: 'https://render.com',
+    icon: <Server className="w-5 h-5" />,
+    keyLabel: 'URL del servidor proxy',
+    keyPlaceholder: 'https://mi-proxy.onrender.com',
+    isShared: true,
   },
   {
     id: 'replicate',
@@ -72,6 +88,12 @@ const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
+const SHARED_PROVIDERS = [
+  { value: 'replicate', label: 'Hunyuan 3D (Replicate)' },
+  { value: 'meshy', label: 'Meshy AI' },
+  { value: 'stability', label: 'Stability AI (SPAR3D)' },
+] as const;
+
 export default function ApiConfigStep({ initialConfig, onSave }: Props) {
   const [provider, setProvider] = useState<ApiProvider>(
     initialConfig?.provider ?? 'huggingface',
@@ -80,14 +102,24 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
   const [replicateModel, setReplicateModel] = useState(
     initialConfig?.replicateModel ?? '',
   );
+  const [proxyUrl, setProxyUrl] = useState(initialConfig?.proxyUrl ?? '');
+  const [sharedProvider, setSharedProvider] = useState<'replicate' | 'meshy' | 'stability'>(
+    initialConfig?.sharedProvider ?? 'replicate',
+  );
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState('');
 
   const current = PROVIDERS.find((p) => p.id === provider)!;
+  const needsKey = !current.noKey && !current.isShared;
+  const isShared = provider === 'shared';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (provider !== 'huggingface' && !apiKey.trim()) {
+    if (isShared && !proxyUrl.trim()) {
+      setError('Por favor ingresa la URL de tu servidor proxy');
+      return;
+    }
+    if (needsKey && !apiKey.trim()) {
       setError('Por favor ingresa tu API key');
       return;
     }
@@ -96,6 +128,8 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
       provider,
       apiKey: apiKey.trim(),
       replicateModel: replicateModel.trim() || DEFAULT_REPLICATE_MODEL,
+      proxyUrl: proxyUrl.trim() || undefined,
+      sharedProvider: isShared ? sharedProvider : undefined,
     });
   };
 
@@ -117,7 +151,7 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
             <button
               key={p.id}
               type="button"
-              onClick={() => setProvider(p.id)}
+              onClick={() => { setProvider(p.id); setError(''); }}
               className={`
                 w-full text-left rounded-2xl border p-4 transition-all duration-200
                 ${
@@ -172,70 +206,113 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
           ))}
         </div>
 
-        {/* API Key input — hidden for free HuggingFace provider */}
-        <div className={`card mt-2 ${provider === 'huggingface' ? 'hidden' : ''}`}>
-          <div className="flex items-center justify-between mb-3">
-            <label className="label mb-0">{current.keyLabel}</label>
-            <a
-              href={current.docsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-            >
-              Obtener key
-              <ExternalLink className="w-3 h-3" />
-            </a>
-          </div>
-          <div className="relative">
-            <input
-              type={showKey ? 'text' : 'password'}
-              className="input-field pr-12"
-              placeholder={current.keyPlaceholder}
-              value={apiKey}
-              onChange={(e) => {
-                setApiKey(e.target.value);
-                setError('');
-              }}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <p className="text-xs text-slate-600 mt-2">
-            Tu API key se guarda solo en este navegador, nunca en ningún servidor.
-          </p>
-
-          {/* Replicate model override */}
-          {provider === 'replicate' && (
-            <div className="mt-4 pt-4 border-t border-[#2a2a4a]">
-              <label className="label">Modelo de Replicate (opcional)</label>
+        {/* Shared proxy config */}
+        {isShared && (
+          <div className="card space-y-4">
+            <div>
+              <label className="label">URL del servidor proxy</label>
               <input
-                type="text"
+                type="url"
                 className="input-field"
-                placeholder={DEFAULT_REPLICATE_MODEL}
-                value={replicateModel}
-                onChange={(e) => setReplicateModel(e.target.value)}
+                placeholder="https://mi-proxy.onrender.com"
+                value={proxyUrl}
+                onChange={(e) => { setProxyUrl(e.target.value); setError(''); }}
+                autoComplete="off"
               />
-              <p className="text-xs text-slate-600 mt-1.5">
-                Por defecto usa{' '}
-                <code className="text-indigo-400">{DEFAULT_REPLICATE_MODEL}</code>.
-                Puedes cambiarlo a cualquier modelo de Replicate compatible.
+              <p className="text-xs text-slate-600 mt-2">
+                Despliega el código de{' '}
+                <code className="text-violet-400">server/</code>
+                {' '}en Render.com y pega aquí la URL.
               </p>
             </div>
-          )}
 
-          {error && (
-            <p className="text-red-400 text-sm mt-3 flex items-center gap-2">
-              <span>⚠</span> {error}
+            <div>
+              <label className="label">Proveedor activo en el servidor</label>
+              <select
+                value={sharedProvider}
+                onChange={(e) => setSharedProvider(e.target.value as typeof sharedProvider)}
+                className="w-full bg-[#0f0f25] border border-[#2a2a4a] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                {SHARED_PROVIDERS.map((sp) => (
+                  <option key={sp.value} value={sp.value}>{sp.label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-600 mt-1.5">
+                Debe coincidir con la API key configurada en el servidor.
+              </p>
+            </div>
+
+            {error && (
+              <p className="text-red-400 text-sm flex items-center gap-2">
+                <span>⚠</span> {error}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* API Key input — only for providers that require one */}
+        {needsKey && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <label className="label mb-0">{current.keyLabel}</label>
+              <a
+                href={current.docsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+              >
+                Obtener key
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                className="input-field pr-12"
+                placeholder={current.keyPlaceholder}
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setError(''); }}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((s) => !s)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 mt-2">
+              Tu API key se guarda solo en este navegador, nunca en ningún servidor.
             </p>
-          )}
-        </div>
+
+            {/* Replicate model override */}
+            {provider === 'replicate' && (
+              <div className="mt-4 pt-4 border-t border-[#2a2a4a]">
+                <label className="label">Modelo de Replicate (opcional)</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={DEFAULT_REPLICATE_MODEL}
+                  value={replicateModel}
+                  onChange={(e) => setReplicateModel(e.target.value)}
+                />
+                <p className="text-xs text-slate-600 mt-1.5">
+                  Por defecto usa{' '}
+                  <code className="text-indigo-400">{DEFAULT_REPLICATE_MODEL}</code>.
+                  Puedes cambiarlo a cualquier modelo de Replicate compatible.
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <p className="text-red-400 text-sm mt-3 flex items-center gap-2">
+                <span>⚠</span> {error}
+              </p>
+            )}
+          </div>
+        )}
 
         <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base">
           Continuar

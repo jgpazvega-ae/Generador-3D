@@ -1,6 +1,6 @@
 import type { UploadedImage, ModelResult, QualityProfile } from '../types';
 
-const BASE = 'https://api.stability.ai';
+const STABILITY_DIRECT = 'https://api.stability.ai';
 
 /**
  * Genera un modelo 3D con Stability AI.
@@ -14,31 +14,17 @@ export async function generateStability3D(
   image: UploadedImage,
   quality: QualityProfile,
   onProgress: (progress: number, message: string) => void,
+  proxyUrl?: string,
 ): Promise<ModelResult> {
   onProgress(15, 'Enviando imagen a Stability AI (SPAR3D)...');
 
   try {
-    return await callEndpoint(
-      apiKey,
-      '/v2beta/3d/stable-point-aware-3d',
-      image,
-      quality,
-      onProgress,
-      true,
-    );
+    return await callEndpoint(apiKey, 'spar3d', image, quality, onProgress, true, proxyUrl);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
-    // Fallback a Fast 3D si SPAR3D no está habilitado en la cuenta
     if (/404|not found|not available|access/i.test(msg)) {
       onProgress(20, 'SPAR3D no disponible, usando Stable Fast 3D...');
-      return await callEndpoint(
-        apiKey,
-        '/v2beta/3d/stable-fast-3d',
-        image,
-        quality,
-        onProgress,
-        false,
-      );
+      return await callEndpoint(apiKey, 'fast3d', image, quality, onProgress, false, proxyUrl);
     }
     throw err;
   }
@@ -46,39 +32,58 @@ export async function generateStability3D(
 
 async function callEndpoint(
   apiKey: string,
-  path: string,
+  endpoint: 'spar3d' | 'fast3d',
   image: UploadedImage,
   quality: QualityProfile,
   onProgress: (progress: number, message: string) => void,
   isSpar: boolean,
+  proxyUrl?: string,
 ): Promise<ModelResult> {
-  const form = new FormData();
-  form.append('image', image.file);
-  form.append('texture_resolution', String(quality.stabilityTextureResolution));
-  form.append('foreground_ratio', isSpar ? '1.3' : '0.85');
-  form.append('remesh', 'quad');
-  if (isSpar) {
-    // SPAR3D permite limitar el número de polígonos del remallado
-    form.append('target_type', 'face');
-    form.append('target_count', '20000');
-  }
-
   onProgress(35, 'Reconstruyendo geometría y texturas...');
 
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'model/gltf-binary' },
-    body: form,
-  });
+  let res: Response;
+
+  if (proxyUrl) {
+    // Proxy mode: send JSON with imageDataUrl
+    const imageDataUrl = image.dataUrl;
+    const body: Record<string, unknown> = {
+      imageDataUrl,
+      texture_resolution: String(quality.stabilityTextureResolution),
+      foreground_ratio: isSpar ? '1.3' : '0.85',
+      remesh: 'quad',
+    };
+    if (isSpar) { body.target_type = 'face'; body.target_count = '20000'; }
+
+    res = await fetch(`${proxyUrl}/proxy/stability/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } else {
+    // Direct mode: send multipart FormData
+    const path = isSpar
+      ? '/v2beta/3d/stable-point-aware-3d'
+      : '/v2beta/3d/stable-fast-3d';
+    const form = new FormData();
+    form.append('image', image.file);
+    form.append('texture_resolution', String(quality.stabilityTextureResolution));
+    form.append('foreground_ratio', isSpar ? '1.3' : '0.85');
+    form.append('remesh', 'quad');
+    if (isSpar) { form.append('target_type', 'face'); form.append('target_count', '20000'); }
+
+    res = await fetch(`${STABILITY_DIRECT}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'model/gltf-binary' },
+      body: form,
+    });
+  }
 
   if (!res.ok) {
     let detail = res.statusText;
     try {
       const j = await res.json();
-      detail = j.errors?.join(', ') || j.message || JSON.stringify(j);
-    } catch {
-      /* binary or empty */
-    }
+      detail = j.errors?.join(', ') || j.message || j.error || JSON.stringify(j);
+    } catch { /* binary or empty */ }
     throw new Error(`${res.status}: ${detail}`);
   }
 

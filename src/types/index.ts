@@ -64,7 +64,7 @@ export interface Measurements {
   unit: MeasurementUnit;
 }
 
-export type ApiProvider = 'meshy' | 'stability' | 'replicate' | 'huggingface';
+export type ApiProvider = 'meshy' | 'stability' | 'replicate' | 'huggingface' | 'shared';
 
 /** Preset de calidad que controla polígonos, pasos de inferencia y resolución de textura */
 export type QualityPreset = 'draft' | 'standard' | 'max';
@@ -124,6 +124,10 @@ export interface ApiConfig {
   provider: ApiProvider;
   apiKey: string;
   replicateModel?: string;
+  /** URL del servidor proxy propio (para provider 'shared') */
+  proxyUrl?: string;
+  /** Qué proveedor usa el proxy (replicate | meshy | stability) */
+  sharedProvider?: 'replicate' | 'meshy' | 'stability';
 }
 
 export interface GenerationSettings {
