@@ -1,15 +1,9 @@
 import type { UploadedImage, ModelResult } from '../types';
-import { convertObjToGlb } from '../utils/objToGlb';
 
 const SPACE = 'https://stabilityai-triposr.hf.space';
 
-function mkHash() {
-  return Math.random().toString(36).slice(2, 14);
-}
-
 // ── Upload ────────────────────────────────────────────────────────────────────
-// Tries /gradio_api/upload (Gradio 5.x) first, falls back to /upload (Gradio 4.x).
-// Returns a complete FileData object with url so Gradio can locate the file.
+// Gradio 5.x: POST /gradio_api/upload  (falls back to /upload for 4.x)
 async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   const res0 = await fetch(dataUrl);
   const blob = await res0.blob();
@@ -18,7 +12,12 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   for (const prefix of ['/gradio_api', '']) {
     const form = new FormData();
     form.append('files', blob, 'input.png');
-    const res = await fetch(`${SPACE}${prefix}/upload`, { method: 'POST', body: form });
+    let res: Response;
+    try {
+      res = await fetch(`${SPACE}${prefix}/upload`, { method: 'POST', body: form });
+    } catch {
+      continue;
+    }
     if (!res.ok) continue;
 
     const paths = (await res.json()) as (string | Record<string, unknown>)[];
@@ -30,114 +29,123 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
         path: first,
         url: `${SPACE}/file=${first}`,
         orig_name: 'input.png',
-        mime_type: 'image/png',
+        mime_type: blob.type || 'image/png',
         size,
         is_stream: false,
         meta: { _type: 'gradio.FileData' },
       };
     }
-    // Gradio 5.x returns objects; ensure url is present
+    const f = first as Record<string, unknown>;
     return {
-      ...first,
-      url: (first.url as string | undefined) ?? `${SPACE}/file=${first.path}`,
-      orig_name: first.orig_name ?? 'input.png',
-      mime_type: first.mime_type ?? 'image/png',
-      size: first.size ?? size,
-      meta: (first.meta as object | undefined) ?? { _type: 'gradio.FileData' },
+      ...f,
+      url: (f.url as string | undefined) ?? `${SPACE}/file=${f.path as string}`,
+      orig_name: f.orig_name ?? 'input.png',
+      mime_type: f.mime_type ?? blob.type ?? 'image/png',
+      size: f.size ?? size,
+      meta: (f.meta as object | undefined) ?? { _type: 'gradio.FileData' },
     };
   }
 
-  throw new Error('No se pudo subir la imagen a HuggingFace');
+  throw new Error('No se pudo subir la imagen a HuggingFace TripoSR');
 }
 
-// ── Queue ─────────────────────────────────────────────────────────────────────
-// Tries /gradio_api/queue/join (Gradio 5.x) then /queue/join (Gradio 4.x).
-async function joinQueue(fnIndex: number, data: unknown[], hash: string): Promise<void> {
-  const body5 = JSON.stringify({ data, fn_index: fnIndex, session_hash: hash, trigger_id: null });
-  const body4 = JSON.stringify({ data, fn_index: fnIndex, session_hash: hash, event_data: null });
+// ── Gradio 5.x /call/ API ─────────────────────────────────────────────────────
+// POST /gradio_api/call/<endpoint>  → { event_id }
+// GET  /gradio_api/call/<endpoint>/<event_id>  → SSE
 
-  for (const [prefix, body] of [
-    ['/gradio_api', body5],
-    ['', body4],
-  ] as [string, string][]) {
-    const res = await fetch(`${SPACE}${prefix}/queue/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-    if (res.ok) return;
-  }
-  throw new Error('Error al unirse a la cola de HuggingFace');
+interface GradioOutput {
+  data: unknown[];
 }
 
-// ── SSE listener ──────────────────────────────────────────────────────────────
-// Tries /gradio_api/queue/data (Gradio 5.x) first, falls back to /queue/data.
-function listenSSE(
-  hash: string,
+function callEndpointSSE(
+  endpoint: string,
+  eventId: string,
   onProgress: (p: number, m: string) => void,
   pStart: number,
   pEnd: number,
 ): Promise<unknown[]> {
-  const urls = [
-    `${SPACE}/gradio_api/queue/data?session_hash=${hash}`,
-    `${SPACE}/queue/data?session_hash=${hash}`,
-  ];
-
   return new Promise((resolve, reject) => {
-    let urlIdx = 0;
-    let es: EventSource;
-    let tmo: ReturnType<typeof setTimeout>;
+    const url = `${SPACE}/gradio_api/call/${endpoint}/${eventId}`;
+    const es = new EventSource(url);
 
-    const tryUrl = (idx: number) => {
-      if (es) { try { es.close(); } catch { /* ignore */ } }
-      es = new EventSource(urls[idx]);
-      tmo = setTimeout(() => {
-        es.close();
-        reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
-      }, 300_000);
+    const tmo = setTimeout(() => {
+      es.close();
+      reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
+    }, 300_000);
 
-      es.onmessage = ({ data }) => {
-        let msg: {
-          msg: string;
-          rank?: number;
-          queue_size?: number;
-          output?: { data?: unknown[]; error?: string };
-          success?: boolean;
-        };
-        try { msg = JSON.parse(data); } catch { return; }
+    es.addEventListener('error', (e) => {
+      // EventSource fires 'error' on SSE data events too — parse them
+      const raw = (e as MessageEvent).data;
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw) as { output?: GradioOutput; msg?: string };
+          if (parsed.output?.data) {
+            clearTimeout(tmo);
+            es.close();
+            resolve(parsed.output.data);
+            return;
+          }
+        } catch { /* not JSON */ }
+      }
+      // Real connection error after a moment (not an SSE data error)
+      clearTimeout(tmo);
+      es.close();
+      reject(new Error('Conexión perdida con HuggingFace. Verifica tu internet.'));
+    });
 
-        if (msg.msg === 'estimation') {
-          const pos = msg.rank ?? msg.queue_size ?? '?';
-          onProgress(pStart, `En cola de HuggingFace: posición ${pos}...`);
-        } else if (msg.msg === 'process_starts') {
-          onProgress(pStart + (pEnd - pStart) * 0.3, 'GPU asignada, procesando...');
-        } else if (msg.msg === 'process_generating') {
-          onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
-        } else if (msg.msg === 'process_completed') {
-          clearTimeout(tmo);
-          es.close();
-          if (msg.output?.error) reject(new Error(msg.output.error));
-          else resolve(msg.output?.data ?? []);
-        } else if (msg.msg === 'error') {
-          clearTimeout(tmo);
-          es.close();
-          reject(new Error('Error en el servidor de HuggingFace. Intenta de nuevo.'));
-        }
-      };
+    es.onmessage = ({ data }) => {
+      let msg: { msg?: string; output?: GradioOutput; rank?: number; queue_size?: number };
+      try { msg = JSON.parse(data); } catch { return; }
 
-      es.onerror = () => {
+      if (!msg.msg) return;
+      if (msg.msg === 'estimation') {
+        const pos = msg.rank ?? msg.queue_size ?? '?';
+        onProgress(pStart, `En cola de HuggingFace: posición ${pos}...`);
+      } else if (msg.msg === 'process_starts') {
+        onProgress(pStart + (pEnd - pStart) * 0.3, 'GPU asignada, procesando...');
+      } else if (msg.msg === 'process_generating') {
+        onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
+      } else if (msg.msg === 'process_completed') {
         clearTimeout(tmo);
-        // If first URL fails immediately, try the other
-        if (idx === 0) { urlIdx = 1; tryUrl(1); }
-        else {
-          es.close();
-          reject(new Error('Conexión perdida con HuggingFace. Verifica tu internet.'));
-        }
-      };
+        es.close();
+        const out = msg.output as (GradioOutput & { error?: string }) | undefined;
+        if (out?.error) reject(new Error(out.error));
+        else resolve(out?.data ?? []);
+      } else if (msg.msg === 'error') {
+        clearTimeout(tmo);
+        es.close();
+        reject(new Error('Error en el servidor de HuggingFace. Intenta de nuevo.'));
+      }
     };
 
-    tryUrl(urlIdx);
+    es.onerror = () => {
+      clearTimeout(tmo);
+      es.close();
+      reject(new Error('No se pudo conectar con HuggingFace. Verifica tu internet.'));
+    };
   });
+}
+
+async function callGradio(
+  endpoint: string,
+  data: unknown[],
+  onProgress: (p: number, m: string) => void,
+  pStart: number,
+  pEnd: number,
+): Promise<unknown[]> {
+  const res = await fetch(`${SPACE}/gradio_api/call/${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `TripoSR error ${res.status} al llamar /${endpoint}`);
+  }
+
+  const { event_id } = await res.json() as { event_id: string };
+  return callEndpointSSE(endpoint, event_id, onProgress, pStart, pEnd);
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -145,47 +153,78 @@ export async function generateWithTripoSR(
   image: UploadedImage,
   onProgress: (p: number, m: string) => void,
 ): Promise<ModelResult> {
+  // 1. Upload
   onProgress(3, 'Subiendo imagen a HuggingFace TripoSR...');
   const uploaded = await uploadImage(image.dataUrl);
 
-  // Step 1: preprocess (fn_index 0) — remove background + normalize
+  // 2. Preprocess — named endpoint /preprocess (Gradio 5.x)
   onProgress(10, 'Preprocesando imagen...');
-  const h1 = mkHash();
-  await joinQueue(0, [uploaded, true, 0.85], h1);
-  const [preprocessed] = await listenSSE(h1, onProgress, 10, 30);
+  const [preprocessed] = await callGradio('preprocess', [uploaded, true, 0.85], onProgress, 10, 30);
 
-  if (preprocessed == null) throw new Error('Preprocesado falló — la imagen no fue aceptada');
+  if (preprocessed == null) throw new Error('Preprocesado falló — imagen no aceptada');
 
-  // Step 2: generate 3D mesh (fn_index 1)
+  // 3. Generate 3D — named endpoint /generate
+  // Output: [OBJ FileData, GLB FileData] (space now provides both formats directly)
   onProgress(35, 'Generando modelo 3D (puede tardar 1–3 min)...');
-  const h2 = mkHash();
-  await joinQueue(1, [preprocessed, 256], h2);
-  const genOut = await listenSSE(h2, onProgress, 35, 92);
+  const genOut = await callGradio('generate', [preprocessed, 256], onProgress, 35, 92);
 
   onProgress(93, 'Descargando modelo 3D...');
 
-  // genOut[0] = gr.Model3D output (OBJ path), genOut[1] = gr.File (download)
-  const fileData = (genOut[1] ?? genOut[0]) as { url?: string; path?: string } | null;
-  if (!fileData) throw new Error('No se recibió modelo del servidor');
+  // Find GLB and OBJ in outputs
+  type FileData = { url?: string; path?: string; orig_name?: string };
+  const toUrl = (fd: FileData | null) =>
+    fd ? (fd.url ?? (fd.path ? `${SPACE}/file=${fd.path}` : null)) : null;
 
-  const fileUrl = fileData.url ?? (fileData.path ? `${SPACE}/file=${fileData.path}` : null);
-  if (!fileUrl) throw new Error('No se pudo obtener la URL del modelo');
+  const glbData = genOut.find(
+    (o) => typeof o === 'object' && o !== null &&
+      ((o as FileData).orig_name?.endsWith('.glb') || (o as FileData).url?.endsWith('.glb') || (o as FileData).path?.endsWith('.glb'))
+  ) as FileData | undefined;
 
-  const modelRes = await fetch(fileUrl);
-  if (!modelRes.ok) throw new Error('Error descargando el modelo 3D');
+  const objData = genOut.find(
+    (o) => typeof o === 'object' && o !== null &&
+      ((o as FileData).orig_name?.endsWith('.obj') || (o as FileData).url?.endsWith('.obj') || (o as FileData).path?.endsWith('.obj'))
+  ) as FileData | undefined;
 
-  const blob = await modelRes.blob();
-  const objUrl = URL.createObjectURL(blob);
+  // Fallback: take first and second outputs
+  const firstData = (genOut[0] ?? null) as FileData | null;
+  const secondData = (genOut[1] ?? null) as FileData | null;
 
-  // Convert OBJ → GLB for in-browser preview
-  onProgress(94, 'Convirtiendo a GLB para vista previa...');
+  const glbUrl_remote = toUrl(glbData ?? secondData);
+  const objUrl_remote = toUrl(objData ?? firstData);
+
+  // Download GLB if available (space now outputs GLB natively — no conversion needed)
   let glbUrl = '';
-  try {
-    const glbBlob = await convertObjToGlb(blob);
-    glbUrl = URL.createObjectURL(glbBlob);
-  } catch {
-    // Conversion failed — still return OBJ for download
+  if (glbUrl_remote) {
+    try {
+      const r = await fetch(glbUrl_remote);
+      if (r.ok) {
+        const b = await r.blob();
+        glbUrl = URL.createObjectURL(b);
+      }
+    } catch { /* will fall through to OBJ */ }
   }
+
+  let objUrl: string | undefined;
+  if (objUrl_remote) {
+    try {
+      const r = await fetch(objUrl_remote);
+      if (r.ok) {
+        const b = await r.blob();
+        objUrl = URL.createObjectURL(b);
+        // If no GLB yet, try converting OBJ → GLB
+        if (!glbUrl) {
+          onProgress(94, 'Convirtiendo a GLB para vista previa...');
+          try {
+            const { convertObjToGlb } = await import('../utils/objToGlb');
+            const glbBlob = await convertObjToGlb(b);
+            glbUrl = URL.createObjectURL(glbBlob);
+          } catch { /* skip */ }
+        }
+      }
+    } catch { /* skip */ }
+  }
+
+  if (!glbUrl && !objUrl) throw new Error('No se pudo descargar el modelo 3D');
 
   return { glbUrl, objUrl, isBlob: true };
 }
