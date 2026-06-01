@@ -1,4 +1,5 @@
 import type { UploadedImage, ModelResult } from '../types';
+import { convertObjToGlb } from '../utils/objToGlb';
 
 const SPACE = 'https://stabilityai-triposr.hf.space';
 
@@ -117,6 +118,15 @@ export async function generateWithTripoSR(
   const blob = await modelRes.blob();
   const objUrl = URL.createObjectURL(blob);
 
-  // TripoSR outputs OBJ — not compatible with <model-viewer> but downloadable
-  return { glbUrl: '', objUrl, isBlob: true };
+  // Convert OBJ → GLB for in-browser preview via <model-viewer>
+  onProgress(94, 'Convirtiendo a GLB para vista previa...');
+  let glbUrl = '';
+  try {
+    const glbBlob = await convertObjToGlb(blob);
+    glbUrl = URL.createObjectURL(glbBlob);
+  } catch {
+    // Conversion failed — still return OBJ for download
+  }
+
+  return { glbUrl, objUrl, isBlob: true };
 }
