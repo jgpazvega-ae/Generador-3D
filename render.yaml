@@ -1,0 +1,33 @@
+# Despliegue de un clic en Render.com para el servidor proxy de Generador 3D.
+# Render detecta este archivo (Blueprint) automáticamente al conectar el repo.
+#
+# Pasos:
+#   1. Sube tu repo a GitHub (ya está).
+#   2. Entra a https://render.com → New + → Blueprint → conecta este repo.
+#   3. Render lee este archivo y crea el servicio. Te pedirá las API keys
+#      marcadas como sync:false (no se guardan en el repo, solo en Render).
+#   4. Pega al menos una key (REPLICATE_TOKEN, MESHY_KEY o STABILITY_KEY).
+#   5. Deploy. Copia la URL pública (https://generador-3d-proxy.onrender.com)
+#      y pégala en la app, opción "Servidor propio".
+services:
+  - type: web
+    name: generador-3d-proxy
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: https://jgpazvega-ae.github.io
+      - key: RATE_LIMIT
+        value: "20"
+      # Pega tu token de Replicate aquí en el panel de Render (no en el repo):
+      - key: REPLICATE_TOKEN
+        sync: false
+      # Opcionales — si también quieres usar Meshy/Stability vía el proxy:
+      - key: MESHY_KEY
+        sync: false
+      - key: STABILITY_KEY
+        sync: false

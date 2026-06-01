@@ -22,7 +22,7 @@ export default function ModelViewerComponent({ src, poster }: Props) {
   const mvRef = useRef<HTMLElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [envIdx, setEnvIdx] = useState(0);
+  const [envIdx, setEnvIdx] = useState(1); // 'neutral' — limpio, sin tinte de color
   const [loading, setLoading] = useState(false);
   const [showEnvLabel, setShowEnvLabel] = useState(false);
 
@@ -112,10 +112,10 @@ export default function ModelViewerComponent({ src, poster }: Props) {
         auto-rotate=""
         auto-rotate-delay="1000"
         rotation-per-second="18deg"
-        shadow-intensity="1.5"
-        shadow-softness="0.7"
-        exposure="1.0"
-        tone-mapping="commerce"
+        shadow-intensity="0.9"
+        shadow-softness="1"
+        exposure="1.1"
+        tone-mapping="neutral"
         environment-image={ENVS[envIdx]}
         ar=""
         ar-modes="webxr scene-viewer quick-look"
