@@ -74,7 +74,7 @@ const PROVIDERS: ProviderInfo[] = [
 
 export default function ApiConfigStep({ initialConfig, onSave }: Props) {
   const [provider, setProvider] = useState<ApiProvider>(
-    initialConfig?.provider ?? 'replicate',
+    initialConfig?.provider ?? 'huggingface',
   );
   const [apiKey, setApiKey] = useState(initialConfig?.apiKey ?? '');
   const [replicateModel, setReplicateModel] = useState(

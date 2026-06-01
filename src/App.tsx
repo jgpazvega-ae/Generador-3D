@@ -17,7 +17,7 @@ import { AlertCircle, RotateCcw } from 'lucide-react';
 
 type AppStep = 'config' | 'upload' | 'processing' | 'result';
 
-const STEP_LABELS = ['Configurar API', 'Subir imágenes', 'Generando', 'Resultado'];
+const STEP_LABELS = ['Proveedor IA', 'Fotos del objeto', 'Generando…', 'Modelo 3D'];
 
 export default function App() {
   const [step, setStep] = useState<AppStep>('config');
@@ -60,7 +60,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a0a16] via-[#0d0d20] to-[#0a0a16]">
+    <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse 120% 60% at 30% 10%, rgba(99,102,241,0.06) 0%, transparent 60%), radial-gradient(ellipse 100% 50% at 70% 90%, rgba(139,92,246,0.05) 0%, transparent 60%), #0a0a16' }}>
       <Header hasConfig={!!apiConfig} onReconfigure={() => setStep('config')} />
 
       <main className="max-w-6xl mx-auto px-4 py-8 pb-20">
