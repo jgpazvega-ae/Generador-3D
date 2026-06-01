@@ -44,7 +44,7 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   throw new Error('No se pudo subir la imagen a HuggingFace TripoSR');
 }
 
-// ── SSE listener (Gradio 5.x named events + 4.x fallback) ────────────────────
+// ── SSE listener (named events + fallback) ────────────────────────────────────
 function callEndpointSSE(
   endpoint: string,
   eventId: string,
@@ -61,10 +61,16 @@ function callEndpointSSE(
       reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
     }, 300_000);
 
-    const done = (data: unknown[]) => { clearTimeout(tmo); es.close(); resolve(data); };
-    const fail = (msg: string) => { clearTimeout(tmo); es.close(); reject(new Error(msg)); };
+    let settled = false;
+    const done = (data: unknown[]) => {
+      if (settled) return; settled = true;
+      clearTimeout(tmo); es.close(); resolve(data);
+    };
+    const fail = (msg: string) => {
+      if (settled) return; settled = true;
+      clearTimeout(tmo); es.close(); reject(new Error(msg));
+    };
 
-    // ── Gradio 5.x named events ──────────────────────────────────────────
     es.addEventListener('generating', () => {
       onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
     });
@@ -74,17 +80,13 @@ function callEndpointSSE(
       catch { done([]); }
     });
 
-    // Named SSE 'error' event sent by Gradio 5.x server
     es.addEventListener('error', (e: Event) => {
       const me = e as MessageEvent;
       if (me.data !== undefined) {
-        // Server-sent error event (has data payload)
         fail(String(me.data || 'Error en el servidor de HuggingFace'));
       }
-      // Connection-level errors are handled by onerror below
     });
 
-    // ── Gradio 4.x unnamed events ─────────────────────────────────────────
     es.onmessage = ({ data }) => {
       let msg: {
         msg?: string;
@@ -110,16 +112,15 @@ function callEndpointSSE(
       }
     };
 
-    // Connection-level error (no data payload)
     es.onerror = (e: Event) => {
       const me = e as MessageEvent;
-      if (me.data !== undefined) return; // Named SSE event — already handled above
+      if (me.data !== undefined) return;
       fail('No se pudo conectar con HuggingFace. Verifica tu internet.');
     };
   });
 }
 
-// ── Gradio /call/ API ─────────────────────────────────────────────────────────
+// ── /call/ API ────────────────────────────────────────────────────────────────
 async function callGradio(
   endpoint: string,
   data: unknown[],
@@ -145,16 +146,13 @@ export async function generateWithTripoSR(
   image: UploadedImage,
   onProgress: (p: number, m: string) => void,
 ): Promise<ModelResult> {
-  // 1. Upload
   onProgress(3, 'Subiendo imagen a HuggingFace TripoSR...');
   const uploaded = await uploadImage(image.dataUrl);
 
-  // 2. Preprocess
   onProgress(10, 'Preprocesando imagen...');
   const [preprocessed] = await callGradio('preprocess', [uploaded, true, 0.85], onProgress, 10, 30);
   if (preprocessed == null) throw new Error('Preprocesado falló — imagen no aceptada');
 
-  // 3. Generate 3D (space outputs both OBJ and GLB)
   onProgress(35, 'Generando modelo 3D (puede tardar 1–3 min)...');
   const genOut = await callGradio('generate', [preprocessed, 256], onProgress, 35, 92);
 
@@ -176,7 +174,6 @@ export async function generateWithTripoSR(
     return f.orig_name?.endsWith('.obj') || f.url?.endsWith('.obj') || f.path?.endsWith('.obj');
   }) as FD | undefined;
 
-  // Fallback ordering: first output is OBJ, second is GLB (TripoSR convention)
   const glbRemote = toUrl(glbData ?? (genOut[1] as FD | null));
   const objRemote = toUrl(objData ?? (genOut[0] as FD | null));
 

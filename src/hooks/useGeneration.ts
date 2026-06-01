@@ -53,7 +53,8 @@ export function useGeneration() {
         try {
           if (attempt > 1) {
             const wait = Math.min(5000 * attempt, 30_000);
-            onProgress(0, `Reintentando (${attempt}/${MAX_RETRIES})... esperando ${wait / 1000}s`);
+            const errMsg = lastError?.message ?? 'error desconocido';
+            onProgress(0, `Reintentando (${attempt}/${MAX_RETRIES})... ${errMsg.slice(0, 60)}`);
             await new Promise((r) => setTimeout(r, wait));
             onProgress(0, `Reintentando (${attempt}/${MAX_RETRIES})...`);
           }
