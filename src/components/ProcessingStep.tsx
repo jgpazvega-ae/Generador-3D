@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import type { GenerationState, UploadedImage } from '../types';
 
 interface Props {
   state: GenerationState;
   images?: UploadedImage[];
+  onCancel?: () => void;
 }
 
 const TIPS = [
@@ -23,7 +25,7 @@ const STAGE_LABELS = [
   { label: 'Finalizando', threshold: 95 },
 ];
 
-export default function ProcessingStep({ state, images = [] }: Props) {
+export default function ProcessingStep({ state, images = [], onCancel }: Props) {
   const [tipIdx, setTipIdx] = useState(0);
   const [tipVisible, setTipVisible] = useState(true);
   const [tick, setTick] = useState(0);
@@ -204,6 +206,34 @@ export default function ProcessingStep({ state, images = [] }: Props) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Cancel button */}
+      {onCancel && (
+        <div className="text-center">
+          <button
+            onClick={onCancel}
+            className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-xl transition-all duration-200"
+            style={{
+              color: 'rgba(100,116,139,0.7)',
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+            onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, {
+              background: 'rgba(239,68,68,0.08)',
+              borderColor: 'rgba(239,68,68,0.2)',
+              color: 'rgba(248,113,113,0.85)',
+            })}
+            onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, {
+              background: 'rgba(255,255,255,0.025)',
+              borderColor: 'rgba(255,255,255,0.06)',
+              color: 'rgba(100,116,139,0.7)',
+            })}
+          >
+            <X className="w-3.5 h-3.5" />
+            Cancelar y volver
+          </button>
         </div>
       )}
 

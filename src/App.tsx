@@ -35,7 +35,7 @@ export default function App() {
     scaleToMeasurements: true,
   });
 
-  const { state: gen, generate, reset } = useGeneration();
+  const { state: gen, generate, reset, cancel } = useGeneration();
 
   const currentIndex = ['config', 'upload', 'processing', 'result'].indexOf(step);
 
@@ -114,7 +114,11 @@ export default function App() {
         )}
 
         {step === 'processing' && (
-          <ProcessingStep state={gen} images={images} />
+          <ProcessingStep
+            state={gen}
+            images={images}
+            onCancel={() => { cancel(); setStep('upload'); }}
+          />
         )}
 
         {step === 'result' && gen.status === 'succeeded' && gen.result && (
