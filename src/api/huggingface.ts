@@ -8,7 +8,7 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   const blob = await res0.blob();
   const size = blob.size;
 
-  for (const prefix of ['/gradio_api', '']) {
+  for (const prefix of ['', '/gradio_api']) {
     const form = new FormData();
     form.append('files', blob, 'input.png');
     let res: Response;
@@ -53,7 +53,7 @@ function callEndpointSSE(
   pEnd: number,
 ): Promise<unknown[]> {
   return new Promise((resolve, reject) => {
-    const url = `${SPACE}/gradio_api/call/${endpoint}/${eventId}`;
+    const url = `${SPACE}/call/${endpoint}/${eventId}`;
     const es = new EventSource(url);
 
     const tmo = setTimeout(() => {
@@ -119,7 +119,7 @@ function callEndpointSSE(
   });
 }
 
-// ── Gradio 5.x /call/ API ─────────────────────────────────────────────────────
+// ── Gradio /call/ API ─────────────────────────────────────────────────────────
 async function callGradio(
   endpoint: string,
   data: unknown[],
@@ -127,7 +127,7 @@ async function callGradio(
   pStart: number,
   pEnd: number,
 ): Promise<unknown[]> {
-  const res = await fetch(`${SPACE}/gradio_api/call/${endpoint}`, {
+  const res = await fetch(`${SPACE}/call/${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data }),
