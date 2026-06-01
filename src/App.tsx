@@ -114,7 +114,7 @@ export default function App() {
         )}
 
         {step === 'processing' && (
-          <ProcessingStep state={gen} />
+          <ProcessingStep state={gen} images={images} />
         )}
 
         {step === 'result' && gen.status === 'succeeded' && gen.result && (

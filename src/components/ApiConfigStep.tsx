@@ -224,18 +224,19 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2.5">
-        {PROVIDERS.map((p) => {
+        {PROVIDERS.map((p, idx) => {
           const selected = provider === p.id;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => { setProvider(p.id); setError(''); }}
-              className={`w-full text-left rounded-2xl transition-all duration-300 ${selected ? 'provider-card-selected' : ''}`}
+              className={`w-full text-left rounded-2xl transition-all duration-300 animate-slide-up ${selected ? 'provider-card-selected' : ''}`}
               style={!selected ? {
                 background: 'rgba(255,255,255,0.02)',
                 border: '1px solid rgba(255,255,255,0.055)',
-              } : {}}
+                animationDelay: `${idx * 60}ms`,
+              } : { animationDelay: `${idx * 60}ms` }}
             >
               <div className="p-4 flex items-start gap-4">
                 {/* Icon */}

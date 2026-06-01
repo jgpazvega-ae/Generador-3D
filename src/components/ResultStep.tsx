@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Download, RotateCcw, Share2, CheckCircle, Ruler, Box, Sparkles } from 'lucide-react';
 import type { ModelResult, Measurements, UploadedImage } from '../types';
 import { ANGLE_LABELS } from '../types';
@@ -14,8 +15,12 @@ interface Props {
 const hasMeasurements = (m: Measurements) => m.width || m.height || m.depth;
 
 export default function ResultStep({ result, measurements, images, onStartOver }: Props) {
+  const [downloadedExt, setDownloadedExt] = useState<string | null>(null);
+
   const handleDownload = async (url: string, ext: string) => {
     await downloadFile(url, `modelo-3d-${Date.now()}.${ext}`);
+    setDownloadedExt(ext.toUpperCase());
+    setTimeout(() => setDownloadedExt(null), 2500);
   };
 
   const handleShare = async () => {
@@ -248,6 +253,26 @@ export default function ResultStep({ result, measurements, images, onStartOver }
         </div>
 
       </div>
+
+      {/* Download toast */}
+      {downloadedExt && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 animate-pop-in pointer-events-none"
+             style={{
+               background: 'rgba(16,185,129,0.12)',
+               border: '1px solid rgba(16,185,129,0.3)',
+               backdropFilter: 'blur(16px)',
+               borderRadius: '999px',
+               padding: '10px 20px',
+               boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(16,185,129,0.15)',
+             }}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm font-semibold text-emerald-300">
+              .{downloadedExt} descargado
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
