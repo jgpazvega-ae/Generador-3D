@@ -89,7 +89,7 @@ export default function ImageUploadStep({
       onImagesChange(updated);
       setLoadingSlot(null);
     },
-    [images, onImagesChange],
+    [images, onImagesChange, slots],
   );
 
   const removeImage = (angle: ViewAngle) => {
