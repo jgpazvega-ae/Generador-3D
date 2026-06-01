@@ -46,7 +46,9 @@ export default function ImageUploadStep({
   const [loadingSlot, setLoadingSlot] = useState<string | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [globalDragActive, setGlobalDragActive] = useState(false);
   const dragCounters = useRef<Record<string, number>>({});
+  const globalDragCounter = useRef(0);
 
   const isSingleView = SINGLE_VIEW_PROVIDERS.includes(provider);
   const slots = isSingleView ? SINGLE_SLOT : MULTI_SLOTS;
@@ -117,15 +119,72 @@ export default function ImageUploadStep({
     e.preventDefault();
     dragCounters.current[angle] = 0;
     setDragOverSlot(null);
+    globalDragCounter.current = 0;
+    setGlobalDragActive(false);
     const file = e.dataTransfer.files?.[0];
     if (file) handleSlotFile(angle, file);
   }, [handleSlotFile]);
+
+  const handleGlobalDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    globalDragCounter.current++;
+    if (e.dataTransfer.types.includes('Files')) setGlobalDragActive(true);
+  }, []);
+
+  const handleGlobalDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    globalDragCounter.current = Math.max(0, globalDragCounter.current - 1);
+    if (globalDragCounter.current === 0) setGlobalDragActive(false);
+  }, []);
+
+  const handleGlobalDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    globalDragCounter.current = 0;
+    setGlobalDragActive(false);
+    setDragOverSlot(null);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    // Auto-assign to next empty slot
+    const nextEmpty = slots.find((s) => !images.find((img) => img.angle === s.angle));
+    if (nextEmpty) handleSlotFile(nextEmpty.angle, file);
+  }, [slots, images, handleSlotFile]);
+
+  const nextEmptySlot = slots.find((s) => !images.find((img) => img.angle === s.angle));
 
   const canGenerate = images.length > 0;
   const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-slide-up">
+    <div
+      className="max-w-4xl mx-auto space-y-6 animate-slide-up relative"
+      onDragEnter={handleGlobalDragEnter}
+      onDragLeave={handleGlobalDragLeave}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleGlobalDrop}
+    >
+      {/* Global drag overlay */}
+      {globalDragActive && !dragOverSlot && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center"
+             style={{ background: 'rgba(8,8,24,0.75)', backdropFilter: 'blur(4px)' }}>
+          <div className="rounded-3xl px-10 py-8 text-center space-y-3"
+               style={{
+                 background: 'rgba(99,102,241,0.1)',
+                 border: '2px dashed rgba(99,102,241,0.6)',
+                 boxShadow: '0 0 60px rgba(99,102,241,0.15)',
+               }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center"
+                 style={{ background: 'rgba(99,102,241,0.2)' }}>
+              <Upload className="w-8 h-8 text-indigo-300 animate-bounce" />
+            </div>
+            <p className="text-lg font-bold text-white">Suelta la imagen</p>
+            <p className="text-sm" style={{ color: 'rgba(165,180,252,0.7)' }}>
+              {nextEmptySlot
+                ? `→ Se añadirá a: ${nextEmptySlot.label}`
+                : 'Todas las posiciones están llenas'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="text-center">
@@ -150,8 +209,9 @@ export default function ImageUploadStep({
           const isLoading = loadingSlot === slot.angle;
           const isHovered = hoveredSlot === slot.angle;
           const isDragOver = dragOverSlot === slot.angle;
+          const isNextTarget = globalDragActive && !dragOverSlot && !img && slot.angle === nextEmptySlot?.angle;
           const filled = !!img;
-          const interactive = isHovered || isDragOver;
+          const interactive = isHovered || isDragOver || isNextTarget;
 
           return (
             <div key={slot.angle} className="flex flex-col gap-2">
@@ -183,6 +243,8 @@ export default function ImageUploadStep({
                 style={{
                   background: isDragOver
                     ? 'rgba(99,102,241,0.1)'
+                    : isNextTarget
+                    ? 'rgba(99,102,241,0.06)'
                     : filled
                     ? '#080818'
                     : isHovered
@@ -190,6 +252,8 @@ export default function ImageUploadStep({
                     : 'rgba(255,255,255,0.018)',
                   border: isDragOver
                     ? '2px solid rgba(99,102,241,0.7)'
+                    : isNextTarget
+                    ? '2px dashed rgba(99,102,241,0.55)'
                     : filled
                     ? '2px solid rgba(99,102,241,0.35)'
                     : isHovered
@@ -199,10 +263,12 @@ export default function ImageUploadStep({
                     : '2px dashed rgba(255,255,255,0.07)',
                   boxShadow: isDragOver
                     ? '0 0 28px rgba(99,102,241,0.2), inset 0 0 20px rgba(99,102,241,0.05)'
+                    : isNextTarget
+                    ? '0 0 20px rgba(99,102,241,0.12)'
                     : filled
                     ? '0 0 20px rgba(99,102,241,0.08)'
                     : 'none',
-                  transform: isDragOver ? 'scale(1.03)' : 'scale(1)',
+                  transform: isDragOver ? 'scale(1.03)' : isNextTarget ? 'scale(1.01)' : 'scale(1)',
                   transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
                 }}
               >
