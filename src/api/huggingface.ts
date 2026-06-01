@@ -2,7 +2,6 @@ import type { UploadedImage, ModelResult } from '../types';
 
 const SPACE = 'https://stabilityai-triposr.hf.space';
 
-// ── Upload ────────────────────────────────────────────────────────────────────
 async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   const res0 = await fetch(dataUrl);
   const blob = await res0.blob();
@@ -44,7 +43,6 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   throw new Error('No se pudo subir la imagen a HuggingFace TripoSR');
 }
 
-// ── SSE listener (named events + fallback) ────────────────────────────────────
 function callEndpointSSE(
   endpoint: string,
   eventId: string,
@@ -61,8 +59,15 @@ function callEndpointSSE(
       reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
     }, 300_000);
 
-    const done = (data: unknown[]) => { clearTimeout(tmo); es.close(); resolve(data); };
-    const fail = (msg: string) => { clearTimeout(tmo); es.close(); reject(new Error(msg)); };
+    let settled = false;
+    const done = (data: unknown[]) => {
+      if (settled) return; settled = true;
+      clearTimeout(tmo); es.close(); resolve(data);
+    };
+    const fail = (msg: string) => {
+      if (settled) return; settled = true;
+      clearTimeout(tmo); es.close(); reject(new Error(msg));
+    };
 
     es.addEventListener('generating', () => {
       onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
@@ -105,15 +110,12 @@ function callEndpointSSE(
       }
     };
 
-    es.onerror = (e: Event) => {
-      const me = e as MessageEvent;
-      if (me.data !== undefined) return;
+    es.onerror = () => {
       fail('No se pudo conectar con HuggingFace. Verifica tu internet.');
     };
   });
 }
 
-// ── /call/ API ────────────────────────────────────────────────────────────────
 async function callGradio(
   endpoint: string,
   data: unknown[],
@@ -134,7 +136,6 @@ async function callGradio(
   return callEndpointSSE(endpoint, event_id, onProgress, pStart, pEnd);
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
 export async function generateWithTripoSR(
   image: UploadedImage,
   onProgress: (p: number, m: string) => void,
