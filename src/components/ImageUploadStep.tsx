@@ -47,6 +47,7 @@ export default function ImageUploadStep({
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [globalDragActive, setGlobalDragActive] = useState(false);
+  const [justFilledSlot, setJustFilledSlot] = useState<string | null>(null);
   const dragCounters = useRef<Record<string, number>>({});
   const globalDragCounter = useRef(0);
 
@@ -88,6 +89,8 @@ export default function ImageUploadStep({
       });
       onImagesChange(updated);
       setLoadingSlot(null);
+      setJustFilledSlot(angle);
+      setTimeout(() => setJustFilledSlot(null), 900);
     },
     [images, onImagesChange, slots],
   );
@@ -210,6 +213,7 @@ export default function ImageUploadStep({
           const isHovered = hoveredSlot === slot.angle;
           const isDragOver = dragOverSlot === slot.angle;
           const isNextTarget = globalDragActive && !dragOverSlot && !img && slot.angle === nextEmptySlot?.angle;
+          const isJustFilled = justFilledSlot === slot.angle;
           const filled = !!img;
           const interactive = isHovered || isDragOver || isNextTarget;
 
@@ -252,6 +256,8 @@ export default function ImageUploadStep({
                     : 'rgba(255,255,255,0.018)',
                   border: isDragOver
                     ? '2px solid rgba(99,102,241,0.7)'
+                    : isJustFilled
+                    ? '2px solid rgba(16,185,129,0.7)'
                     : isNextTarget
                     ? '2px dashed rgba(99,102,241,0.55)'
                     : filled
@@ -263,12 +269,14 @@ export default function ImageUploadStep({
                     : '2px dashed rgba(255,255,255,0.07)',
                   boxShadow: isDragOver
                     ? '0 0 28px rgba(99,102,241,0.2), inset 0 0 20px rgba(99,102,241,0.05)'
+                    : isJustFilled
+                    ? '0 0 32px rgba(16,185,129,0.35)'
                     : isNextTarget
                     ? '0 0 20px rgba(99,102,241,0.12)'
                     : filled
                     ? '0 0 20px rgba(99,102,241,0.08)'
                     : 'none',
-                  transform: isDragOver ? 'scale(1.03)' : isNextTarget ? 'scale(1.01)' : 'scale(1)',
+                  transform: isDragOver ? 'scale(1.03)' : isNextTarget ? 'scale(1.01)' : isJustFilled ? 'scale(1.02)' : 'scale(1)',
                   transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
                 }}
               >
