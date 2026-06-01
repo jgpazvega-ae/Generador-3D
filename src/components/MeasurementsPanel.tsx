@@ -19,56 +19,73 @@ export default function MeasurementsPanel({ value, onChange }: Props) {
   const hasMeasurements = value.width || value.height || value.depth;
 
   return (
-    <div className="card-sm">
+    <div className="rounded-2xl overflow-hidden"
+         style={{ background: 'rgba(255,255,255,0.018)', border: '1px solid rgba(99,102,241,0.1)' }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between text-left"
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left transition-colors duration-200"
+        style={{ background: 'transparent' }}
+        onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.03)')}
+        onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[#1a1a38] rounded-lg flex items-center justify-center">
-            <Ruler className="w-4 h-4 text-indigo-400" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+               style={{
+                 background: hasMeasurements ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)',
+                 border: '1px solid rgba(99,102,241,0.2)',
+               }}>
+            <Ruler className="w-3.5 h-3.5" style={{ color: hasMeasurements ? '#a5b4fc' : 'rgba(99,102,241,0.6)' }} />
           </div>
           <div>
-            <span className="font-medium text-white text-sm">Medidas reales</span>
-            {hasMeasurements && !open && (
-              <p className="text-xs text-indigo-400 mt-0.5">
+            <p className="font-semibold text-sm" style={{ color: hasMeasurements ? 'white' : 'rgba(148,163,184,0.8)' }}>
+              Medidas reales
+            </p>
+            {hasMeasurements && !open ? (
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(165,180,252,0.7)' }}>
                 {[value.width && `A: ${value.width}`, value.height && `H: ${value.height}`, value.depth && `P: ${value.depth}`]
                   .filter(Boolean)
                   .join(' · ')}{' '}
                 {value.unit}
               </p>
-            )}
-            {!hasMeasurements && (
-              <p className="text-xs text-slate-500 mt-0.5">Opcional — mejora la precisión</p>
+            ) : (
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(71,85,105,0.7)' }}>
+                Opcional — mejora la precisión del escalado
+              </p>
             )}
           </div>
         </div>
-        {open ? (
-          <ChevronUp className="w-4 h-4 text-slate-500" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-slate-500" />
-        )}
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(100,116,139,0.6)' }}>
+          {open
+            ? <ChevronUp className="w-4 h-4" />
+            : <ChevronDown className="w-4 h-4" />
+          }
+        </div>
       </button>
 
       {open && (
-        <div className="mt-4 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+        <div className="px-4 pb-4 space-y-3 animate-slide-down"
+             style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="grid grid-cols-3 gap-3 pt-3">
             {(
               [
-                { key: 'width' as const, label: 'Ancho' },
-                { key: 'height' as const, label: 'Alto' },
-                { key: 'depth' as const, label: 'Profund.' },
+                { key: 'width' as const, label: 'Ancho', placeholder: '0' },
+                { key: 'height' as const, label: 'Alto', placeholder: '0' },
+                { key: 'depth' as const, label: 'Prof.', placeholder: '0' },
               ] as const
-            ).map(({ key, label }) => (
+            ).map(({ key, label, placeholder }) => (
               <div key={key}>
-                <label className="label text-xs">{label}</label>
+                <label className="block text-[11px] font-semibold mb-1.5"
+                       style={{ color: 'rgba(100,116,139,0.75)' }}>
+                  {label}
+                </label>
                 <input
                   type="number"
                   min="0"
                   step="any"
                   className="input-field text-sm py-2"
-                  placeholder="0"
+                  placeholder={placeholder}
                   value={value[key]}
                   onChange={(e) => set(key, e.target.value)}
                 />
@@ -77,18 +94,27 @@ export default function MeasurementsPanel({ value, onChange }: Props) {
           </div>
 
           <div>
-            <label className="label text-xs">Unidad</label>
-            <div className="flex gap-2">
+            <label className="block text-[11px] font-semibold mb-1.5"
+                   style={{ color: 'rgba(100,116,139,0.75)' }}>
+              Unidad
+            </label>
+            <div className="grid grid-cols-4 gap-2">
               {UNITS.map((u) => (
                 <button
                   key={u}
                   type="button"
                   onClick={() => set('unit', u)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    value.unit === u
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-[#0f0f25] text-slate-400 border border-[#2a2a4a] hover:border-indigo-500/50'
-                  }`}
+                  className="py-2 rounded-xl text-sm font-semibold transition-all duration-200"
+                  style={{
+                    background: value.unit === u
+                      ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(124,58,237,0.2))'
+                      : 'rgba(255,255,255,0.025)',
+                    border: value.unit === u
+                      ? '1px solid rgba(99,102,241,0.5)'
+                      : '1px solid rgba(255,255,255,0.06)',
+                    color: value.unit === u ? 'white' : 'rgba(100,116,139,0.7)',
+                    boxShadow: value.unit === u ? '0 0 14px rgba(99,102,241,0.1)' : 'none',
+                  }}
                 >
                   {UNIT_LABELS[u]}
                 </button>
@@ -96,9 +122,8 @@ export default function MeasurementsPanel({ value, onChange }: Props) {
             </div>
           </div>
 
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Las medidas se incluyen en los metadatos del modelo y ayudan a escalar
-            correctamente la pieza en software CAD.
+          <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(71,85,105,0.7)' }}>
+            Escala el modelo GLB a las dimensiones físicas del objeto para su uso en software CAD o impresoras 3D.
           </p>
         </div>
       )}

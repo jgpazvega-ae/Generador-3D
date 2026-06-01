@@ -6,4 +6,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  build: {
+    // Three.js and ONNX runtime are already code-split into separate lazy chunks;
+    // raising the limit suppresses false-positive warnings for these expected large deps.
+    chunkSizeWarningLimit: 800,
+  },
 })

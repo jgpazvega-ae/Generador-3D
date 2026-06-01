@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type {
   ApiConfig,
   UploadedImage,
@@ -32,6 +32,12 @@ export function useGeneration() {
     progress: 0,
     message: '',
   });
+  const cancelledRef = useRef(false);
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true;
+    setState({ status: 'idle', progress: 0, message: '' });
+  }, []);
 
   const generate = useCallback(
     async (
@@ -40,9 +46,11 @@ export function useGeneration() {
       settings: GenerationSettings,
       measurements: Measurements,
     ) => {
+      cancelledRef.current = false;
       setState({ status: 'pending', progress: 0, message: 'Iniciando...' });
 
       const onProgress = (progress: number, message: string) => {
+        if (cancelledRef.current) return;
         setState((prev) => ({ ...prev, status: 'processing', progress, message }));
       };
 
@@ -56,9 +64,11 @@ export function useGeneration() {
             const errMsg = lastError?.message ?? 'error desconocido';
             onProgress(0, `Reintentando (${attempt}/${MAX_RETRIES})... ${errMsg.slice(0, 60)}`);
             await new Promise((r) => setTimeout(r, wait));
+            if (cancelledRef.current) return;
             onProgress(0, `Reintentando (${attempt}/${MAX_RETRIES})...`);
           }
 
+          if (cancelledRef.current) return;
           const quality = QUALITY_PROFILES[settings.quality];
 
           // 1. Preprocesado: (opcional) quitar fondo + comprimir/orientar
@@ -74,6 +84,7 @@ export function useGeneration() {
             );
           }
 
+          if (cancelledRef.current) return;
           onProgress(5, 'Optimizando imágenes...');
           const compressed = await Promise.all(
             prepared.map(async (img) => ({
@@ -81,12 +92,17 @@ export function useGeneration() {
               dataUrl: await compressImageToDataUrl(img.file),
             })),
           );
+          if (cancelledRef.current) return;
 
           // 2. Generación según proveedor
           const proxy = config.proxyUrl?.trim() || undefined;
           const sharedProvider = config.sharedProvider ?? 'replicate';
           const effectiveProvider =
             config.provider === 'shared' ? sharedProvider : config.provider;
+
+          // For single-view providers always use the 'front' angle image (or first if absent)
+          const frontImage =
+            compressed.find((img) => img.angle === 'front') ?? compressed[0];
 
           let result: ModelResult;
           if (effectiveProvider === 'meshy') {
@@ -101,13 +117,13 @@ export function useGeneration() {
           } else if (effectiveProvider === 'stability') {
             result = await generateStability3D(
               config.apiKey,
-              compressed[0],
+              frontImage,
               quality,
               onProgress,
               proxy,
             );
           } else if (effectiveProvider === 'huggingface') {
-            result = await generateWithTripoSR(compressed[0], onProgress);
+            result = await generateWithTripoSR(frontImage, onProgress);
           } else {
             result = await generateHunyuan3D(
               config.apiKey,
@@ -133,6 +149,7 @@ export function useGeneration() {
             }
           }
 
+          if (cancelledRef.current) return;
           setState({ status: 'succeeded', progress: 100, message: '¡Modelo 3D generado exitosamente!', result });
           return; // success — exit retry loop
         } catch (err) {
@@ -153,8 +170,9 @@ export function useGeneration() {
   );
 
   const reset = useCallback(() => {
+    cancelledRef.current = false;
     setState({ status: 'idle', progress: 0, message: '' });
   }, []);
 
-  return { state, generate, reset };
+  return { state, generate, reset, cancel };
 }
