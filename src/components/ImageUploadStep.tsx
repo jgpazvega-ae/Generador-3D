@@ -218,6 +218,9 @@ export default function ImageUploadStep({
     return () => window.removeEventListener('paste', onPaste);
   }, [slots, images, handleMultipleFiles]);
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+  const pasteKey = isMac ? '⌘V' : 'Ctrl+V';
+
   const canGenerate = images.length > 0;
   const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
 
@@ -276,7 +279,7 @@ export default function ImageUploadStep({
            style={{ color: 'rgba(71,85,105,0.6)' }}>
           <span>Clic · Arrastra · <kbd className="px-1 py-0.5 rounded text-[10px]"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-            ⌘V
+            {pasteKey}
           </kbd> Pegar</span>
         </p>
       </div>
@@ -439,7 +442,7 @@ export default function ImageUploadStep({
                     {!isHovered && !isDragOver && slot.angle === nextEmptySlot?.angle && (
                       <span className="text-[9px] font-medium"
                             style={{ color: 'rgba(99,102,241,0.45)' }}>
-                        ⌘V para pegar
+                        {pasteKey} para pegar
                       </span>
                     )}
                   </div>

@@ -77,8 +77,9 @@ export default function ResultStep({ result, measurements, images, onStartOver }
               <p className="font-bold text-emerald-300 text-sm tracking-tight">¡Modelo 3D generado exitosamente!</p>
               {result.isBlob && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(245,158,11,0.1)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  Temporal
+                      title="El archivo vive en el navegador. Descárgalo antes de cerrar esta pestaña."
+                      style={{ background: 'rgba(245,158,11,0.1)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)', cursor: 'help' }}>
+                  ⚠ Descarga antes de cerrar
                 </span>
               )}
             </div>
