@@ -28,9 +28,12 @@ const MAX_IMAGES: Record<ApiProvider, number> = {
   replicate: 4,
   meshy: 4,
   stability: 1,
-  huggingface: 1,
+  huggingface: 4,
   shared: 4,
 };
+
+// Providers that only consume the first image for generation (single-view models)
+const SINGLE_VIEW: ApiProvider[] = ['stability', 'huggingface'];
 
 const ANGLES: ViewAngle[] = ['front', 'back', 'left', 'right', 'top', 'bottom', 'diagonal', 'custom'];
 
@@ -140,6 +143,8 @@ export default function ImageUploadStep({
         <p className="text-sm" style={{ color: 'rgba(100,116,139,0.8)' }}>
           {provider === 'stability'
             ? 'Este proveedor usa 1 imagen. Elige la mejor vista.'
+            : provider === 'huggingface'
+            ? `Sube hasta ${maxImages} fotos (se usa la primera para el modelo). Mínimo 1.`
             : `Sube hasta ${maxImages} fotos desde distintos ángulos para mejor calidad`}
         </p>
       </div>
@@ -283,8 +288,11 @@ export default function ImageUploadStep({
               Cómo lograr ~99% de similitud
             </p>
             <ul className="text-sm space-y-0.5 list-disc list-inside" style={{ color: 'rgba(100,116,139,0.85)' }}>
-              {provider !== 'stability' && (
+              {!SINGLE_VIEW.includes(provider) && (
                 <li>Sube frente, atrás e izquierda/derecha del mismo objeto.</li>
+              )}
+              {provider === 'huggingface' && (
+                <li>TripoSR usa 1 imagen: la primera y mejor vista del objeto.</li>
               )}
               <li>Fondo liso y uniforme, buena iluminación sin sombras duras.</li>
               <li>La pieza centrada, nítida y ocupando casi todo el encuadre.</li>

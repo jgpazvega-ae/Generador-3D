@@ -134,10 +134,11 @@ export function useGeneration() {
           }
 
           setState({ status: 'succeeded', progress: 100, message: '¡Modelo 3D generado exitosamente!', result });
-          return;
+          return; // success — exit retry loop
         } catch (err) {
           lastError = err instanceof Error ? err : new Error(String(err));
           if (!isRetryable(lastError) || attempt === MAX_RETRIES) break;
+          // retryable — loop continues
         }
       }
 
