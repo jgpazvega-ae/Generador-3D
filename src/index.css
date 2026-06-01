@@ -20,11 +20,11 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #111128;
+    background: #080814;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #3730a3;
+    background: #312e81;
     border-radius: 3px;
   }
 
@@ -35,27 +35,36 @@
 
 @layer components {
   .card {
-    @apply bg-[#111128] border border-[#2a2a4a] rounded-2xl p-6;
+    @apply bg-[#0f0f22] border border-[#232340] rounded-2xl p-6;
   }
 
   .card-sm {
-    @apply bg-[#111128] border border-[#2a2a4a] rounded-xl p-4;
+    @apply bg-[#0f0f22] border border-[#232340] rounded-xl p-4;
+  }
+
+  .card-glass {
+    @apply bg-white/[0.03] backdrop-blur-sm border border-white/[0.07] rounded-2xl p-6;
   }
 
   .btn-primary {
-    @apply bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-xl
+           transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed
+           active:scale-[0.98] shadow-lg shadow-indigo-600/20 hover:shadow-indigo-500/30;
   }
 
   .btn-secondary {
-    @apply bg-[#1a1a38] hover:bg-[#22224a] text-slate-300 font-medium px-5 py-2.5 rounded-xl border border-[#2a2a4a] hover:border-indigo-500/50 transition-all duration-200 active:scale-95;
+    @apply bg-[#151530] hover:bg-[#1c1c3a] text-slate-300 font-medium px-5 py-2.5 rounded-xl
+           border border-[#2a2a4a] hover:border-indigo-500/40 transition-all duration-200 active:scale-[0.98];
   }
 
   .btn-ghost {
-    @apply text-slate-400 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg transition-all duration-200;
+    @apply text-slate-400 hover:text-white hover:bg-white/[0.06] px-4 py-2 rounded-lg transition-all duration-200;
   }
 
   .input-field {
-    @apply bg-[#0f0f25] border border-[#2a2a4a] focus:border-indigo-500 rounded-xl px-4 py-3 text-white placeholder:text-slate-600 outline-none transition-colors duration-200 w-full;
+    @apply bg-[#0a0a1e] border border-[#2a2a4a] focus:border-indigo-500/70 rounded-xl px-4 py-3
+           text-white placeholder:text-slate-600 outline-none transition-all duration-200 w-full
+           focus:shadow-[0_0_0_3px_rgba(99,102,241,0.1)];
   }
 
   .label {
@@ -67,7 +76,15 @@
   }
 
   .glow-border {
-    @apply border border-indigo-500/30 shadow-[0_0_20px_rgba(99,102,241,0.1)];
+    @apply border border-indigo-500/30 shadow-[0_0_24px_rgba(99,102,241,0.12)];
+  }
+
+  /* 3D Viewer overlay button */
+  .viewer-btn {
+    @apply w-9 h-9 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl
+           flex items-center justify-center text-white/60
+           hover:text-white hover:bg-black/80 hover:border-white/25
+           transition-all duration-200 shadow-lg;
   }
 }
 
@@ -76,9 +93,68 @@ model-viewer {
   width: 100%;
   height: 100%;
   background: transparent;
+  --poster-color: transparent;
 }
 
-/* Drag highlight */
-.drag-active {
-  @apply border-indigo-500 bg-indigo-500/5;
+/* Fullscreen viewer */
+.viewer-wrap:fullscreen {
+  background: #080814;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer-wrap:fullscreen model-viewer {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+}
+
+/* Animations */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes glow-pulse {
+  0%,100% { box-shadow: 0 0 20px rgba(99,102,241,0.15), 0 0 40px rgba(99,102,241,0.05); }
+  50%     { box-shadow: 0 0 40px rgba(99,102,241,0.30), 0 0 80px rgba(99,102,241,0.10); }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(52px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(52px) rotate(-360deg); }
+}
+
+@keyframes orbit-reverse {
+  from { transform: rotate(0deg) translateX(38px) rotate(0deg); }
+  to   { transform: rotate(-360deg) translateX(38px) rotate(360deg); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
+}
+
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.animate-orbit {
+  animation: orbit 3s linear infinite;
+}
+
+.animate-orbit-reverse {
+  animation: orbit-reverse 5s linear infinite;
 }
