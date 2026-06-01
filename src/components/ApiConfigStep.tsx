@@ -231,13 +231,19 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
               key={p.id}
               type="button"
               onClick={() => { setProvider(p.id); setError(''); }}
-              className={`w-full text-left rounded-2xl transition-all duration-300 animate-slide-up ${selected ? 'provider-card-selected' : ''}`}
+              className={`relative w-full text-left rounded-2xl transition-all duration-300 animate-slide-up ${selected ? 'provider-card-selected' : 'provider-card-unselected'}`}
               style={!selected ? {
                 background: 'rgba(255,255,255,0.02)',
                 border: '1px solid rgba(255,255,255,0.055)',
                 animationDelay: `${idx * 60}ms`,
               } : { animationDelay: `${idx * 60}ms` }}
             >
+              {/* Top accent for free provider */}
+              {p.noKey && (
+                <div className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl"
+                     style={{ background: selected ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, rgba(16,185,129,0.4), transparent)' }} />
+              )}
+
               <div className="p-4 flex items-start gap-4">
                 {/* Icon */}
                 <div
