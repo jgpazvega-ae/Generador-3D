@@ -162,12 +162,31 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 inset-x-0 py-3"
-              style={{ background: 'rgba(7,7,26,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <p className="text-center text-xs" style={{ color: 'rgba(51,65,85,0.8)' }}>
-          Generador 3D · Powered by{' '}
-          <span style={{ color: 'rgba(71,85,105,0.7)' }}>Hunyuan 3D, TripoSR, Meshy AI &amp; Stability AI</span>
-        </p>
+      <footer className="fixed bottom-0 inset-x-0 py-2.5"
+              style={{
+                background: 'rgba(8,8,24,0.88)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                borderTop: '1px solid rgba(255,255,255,0.04)',
+              }}>
+        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
+          <p className="text-xs" style={{ color: 'rgba(51,65,85,0.8)' }}>
+            Generador 3D · IA
+          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] hidden sm:inline" style={{ color: 'rgba(51,65,85,0.6)' }}>
+              Powered by
+            </span>
+            <div className="flex items-center gap-2">
+              {['TripoSR', 'Hunyuan 3D', 'Meshy', 'SPAR3D'].map((name) => (
+                <span key={name} className="text-[10px] px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(255,255,255,0.03)', color: 'rgba(71,85,105,0.65)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );
