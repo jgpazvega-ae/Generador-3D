@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Maximize2, Minimize2, RotateCcw, Sun } from 'lucide-react';
+import { Maximize2, Minimize2, RotateCcw, Sun, Pause, Play, Camera } from 'lucide-react';
 
 interface Props {
   src: string;
@@ -25,6 +25,8 @@ export default function ModelViewerComponent({ src, poster }: Props) {
   const [envIdx, setEnvIdx] = useState(1); // 'neutral' — limpio, sin tinte de color
   const [loading, setLoading] = useState(false);
   const [showEnvLabel, setShowEnvLabel] = useState(false);
+  const [isRotating, setIsRotating] = useState(true);
+  const [screenshotFlash, setScreenshotFlash] = useState(false);
 
   useEffect(() => {
     if (!src) return;
@@ -66,6 +68,35 @@ export default function ModelViewerComponent({ src, poster }: Props) {
     setEnvIdx(i => (i + 1) % ENVS.length);
     setShowEnvLabel(true);
     setTimeout(() => setShowEnvLabel(false), 2000);
+  };
+
+  const toggleAutoRotate = () => {
+    const mv = mvRef.current;
+    if (!mv) return;
+    if (isRotating) {
+      mv.removeAttribute('auto-rotate');
+    } else {
+      mv.setAttribute('auto-rotate', '');
+    }
+    setIsRotating(r => !r);
+  };
+
+  const captureScreenshot = async () => {
+    const mv = mvRef.current as HTMLElement & { toBlob?: () => Promise<Blob> };
+    if (!mv?.toBlob) return;
+    try {
+      const blob = await mv.toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `modelo-3d-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setScreenshotFlash(true);
+      setTimeout(() => setScreenshotFlash(false), 800);
+    } catch { /* ignore */ }
   };
 
   if (!src) return null;
@@ -136,13 +167,30 @@ export default function ModelViewerComponent({ src, poster }: Props) {
         </div>
       )}
 
+      {/* Screenshot flash overlay */}
+      {screenshotFlash && (
+        <div className="absolute inset-0 z-30 pointer-events-none animate-fade-in rounded-xl"
+             style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'brightness(1.5)' }} />
+      )}
+
       {/* Hover controls */}
       <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
         <button onClick={resetCamera} className="viewer-btn" title="Resetear cámara">
           <RotateCcw className="w-[15px] h-[15px]" />
         </button>
+        <button
+          onClick={toggleAutoRotate}
+          className="viewer-btn"
+          title={isRotating ? 'Pausar rotación' : 'Reanudar rotación'}
+          style={!isRotating ? { background: 'rgba(99,102,241,0.35)', borderColor: 'rgba(99,102,241,0.6)', color: 'white' } : {}}
+        >
+          {isRotating ? <Pause className="w-[15px] h-[15px]" /> : <Play className="w-[15px] h-[15px]" />}
+        </button>
         <button onClick={cycleEnv} className="viewer-btn" title="Cambiar iluminación">
           <Sun className="w-[15px] h-[15px]" />
+        </button>
+        <button onClick={captureScreenshot} className="viewer-btn" title="Capturar imagen PNG">
+          <Camera className="w-[15px] h-[15px]" />
         </button>
         <button onClick={toggleFullscreen} className="viewer-btn" title={isFullscreen ? 'Salir pantalla completa' : 'Pantalla completa'}>
           {isFullscreen ? <Minimize2 className="w-[15px] h-[15px]" /> : <Maximize2 className="w-[15px] h-[15px]" />}
@@ -151,8 +199,8 @@ export default function ModelViewerComponent({ src, poster }: Props) {
 
       {/* Usage hint */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none">
-        <span className="text-[10px] text-white/30 whitespace-nowrap">
-          Arrastra para rotar · Scroll para zoom
+        <span className="text-[10px] text-white/30 whitespace-nowrap bg-black/30 px-2.5 py-1 rounded-full backdrop-blur-sm">
+          Arrastra · Scroll · Pausa ⏸ · Captura 📷
         </span>
       </div>
     </div>

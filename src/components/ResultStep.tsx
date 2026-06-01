@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, RotateCcw, Share2, CheckCircle, Ruler, Box, Sparkles } from 'lucide-react';
+import { Download, RotateCcw, Share2, CheckCircle, Ruler, Box, Sparkles, Copy, Check as CheckIcon } from 'lucide-react';
 import type { ModelResult, Measurements, UploadedImage } from '../types';
 import { ANGLE_LABELS } from '../types';
 import { downloadFile } from '../utils/imageUtils';
@@ -16,10 +16,14 @@ const hasMeasurements = (m: Measurements) => m.width || m.height || m.depth;
 
 export default function ResultStep({ result, measurements, images, onStartOver }: Props) {
   const [downloadedExt, setDownloadedExt] = useState<string | null>(null);
+  const [downloadedExts, setDownloadedExts] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
 
   const handleDownload = async (url: string, ext: string) => {
     await downloadFile(url, `modelo-3d-${Date.now()}.${ext}`);
-    setDownloadedExt(ext.toUpperCase());
+    const upper = ext.toUpperCase();
+    setDownloadedExt(upper);
+    setDownloadedExts(s => new Set([...s, upper]));
     setTimeout(() => setDownloadedExt(null), 2500);
   };
 
@@ -30,7 +34,8 @@ export default function ResultStep({ result, measurements, images, onStartOver }
     }
     if (result.glbUrl && !result.isBlob) {
       await navigator.clipboard.writeText(result.glbUrl).catch(() => {});
-      alert('URL copiada al portapapeles');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } else {
       alert('Modelo temporal: descárgalo primero para guardarlo.');
     }
@@ -142,34 +147,44 @@ export default function ResultStep({ result, measurements, images, onStartOver }
           </h3>
           {downloads.length > 0 ? (
             <div className="space-y-2">
-              {downloads.map((d) => (
-                <button
-                  key={d.ext}
-                  onClick={() => handleDownload(d.url, d.ext)}
-                  className="w-full flex items-center justify-between rounded-xl px-4 py-3 transition-all duration-200 group"
-                  style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                  }}
-                  onMouseEnter={e => Object.assign((e.currentTarget as HTMLElement).style, {
-                    background: 'rgba(99,102,241,0.06)',
-                    borderColor: 'rgba(99,102,241,0.25)',
-                  })}
-                  onMouseLeave={e => Object.assign((e.currentTarget as HTMLElement).style, {
-                    background: 'rgba(255,255,255,0.02)',
-                    borderColor: 'rgba(255,255,255,0.06)',
-                  })}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
-                         style={{ background: `${d.color}1a`, color: d.color, border: `1px solid ${d.color}30` }}>
-                      .{d.label}
+              {downloads.map((d) => {
+                const wasDownloaded = downloadedExts.has(d.label);
+                return (
+                  <button
+                    key={d.ext}
+                    onClick={() => handleDownload(d.url, d.ext)}
+                    className="w-full flex items-center justify-between rounded-xl px-4 py-3 transition-all duration-300"
+                    style={{
+                      background: wasDownloaded ? 'rgba(16,185,129,0.05)' : 'rgba(255,255,255,0.02)',
+                      border: wasDownloaded ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                    }}
+                    onMouseEnter={e => {
+                      if (!wasDownloaded) Object.assign((e.currentTarget as HTMLElement).style, {
+                        background: 'rgba(99,102,241,0.06)',
+                        borderColor: 'rgba(99,102,241,0.25)',
+                      });
+                    }}
+                    onMouseLeave={e => {
+                      if (!wasDownloaded) Object.assign((e.currentTarget as HTMLElement).style, {
+                        background: 'rgba(255,255,255,0.02)',
+                        borderColor: 'rgba(255,255,255,0.06)',
+                      });
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+                           style={{ background: `${d.color}1a`, color: d.color, border: `1px solid ${d.color}30` }}>
+                        .{d.label}
+                      </div>
+                      <p className="text-xs text-left" style={{ color: 'rgba(100,116,139,0.8)' }}>{d.desc}</p>
                     </div>
-                    <p className="text-xs text-left" style={{ color: 'rgba(100,116,139,0.8)' }}>{d.desc}</p>
-                  </div>
-                  <Download className="w-4 h-4 transition-colors" style={{ color: 'rgba(71,85,105,0.6)' }} />
-                </button>
-              ))}
+                    {wasDownloaded
+                      ? <CheckIcon className="w-4 h-4" style={{ color: '#34d399' }} />
+                      : <Download className="w-4 h-4" style={{ color: 'rgba(71,85,105,0.6)' }} />
+                    }
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm" style={{ color: 'rgba(71,85,105,0.8)' }}>Sin archivos disponibles</p>
@@ -213,10 +228,11 @@ export default function ResultStep({ result, measurements, images, onStartOver }
           <div className="flex gap-2">
             <button
               onClick={handleShare}
-              className="btn-secondary flex items-center gap-2 flex-1 justify-center text-sm py-2.5"
+              className="btn-secondary flex items-center gap-2 flex-1 justify-center text-sm py-2.5 transition-all duration-300"
+              style={copied ? { borderColor: 'rgba(16,185,129,0.4)', color: '#6ee7b7' } : {}}
             >
-              <Share2 className="w-4 h-4" />
-              Compartir
+              {copied ? <CheckIcon className="w-4 h-4" /> : result.isBlob ? <Share2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copiado' : result.isBlob ? 'Compartir' : 'Copiar URL'}
             </button>
             <button
               onClick={onStartOver}
