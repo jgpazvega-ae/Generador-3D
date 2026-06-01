@@ -282,6 +282,26 @@ export default function ImageUploadStep({
             {pasteKey}
           </kbd> Pegar</span>
         </p>
+
+        {/* Single-view provider notice with upgrade path */}
+        {isSingleView && (
+          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full animate-slide-down"
+               style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)' }}>
+            <span className="text-[11px]" style={{ color: 'rgba(253,230,138,0.7)' }}>
+              Este proveedor solo acepta 1 imagen
+            </span>
+            <span style={{ color: 'rgba(100,116,139,0.5)' }}>·</span>
+            <button
+              onClick={onBack}
+              className="text-[11px] font-semibold transition-colors"
+              style={{ color: 'rgba(253,230,138,0.9)' }}
+              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'white')}
+              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(253,230,138,0.9)')}
+            >
+              Cambiar a Meshy / Hunyuan para hasta 4 vistas →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* View angle slots */}
