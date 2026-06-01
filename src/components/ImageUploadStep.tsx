@@ -79,7 +79,6 @@ export default function ImageUploadStep({
         angle,
       };
 
-      // Keep images ordered by slot order so front is always first in the array
       const slotOrder = slots.map((s) => s.angle);
       const updated = [...images.filter((i) => i.angle !== angle), newImg];
       updated.sort((a, b) => {
@@ -93,6 +92,52 @@ export default function ImageUploadStep({
       setTimeout(() => setJustFilledSlot(null), 900);
     },
     [images, onImagesChange, slots],
+  );
+
+  // Process multiple files at once into a batch state update — avoids stale-closure
+  // race condition that would lose all but the last image when called in a loop.
+  const handleMultipleFiles = useCallback(
+    async (targets: ViewSlot[], files: File[]) => {
+      if (!targets.length || !files.length) return;
+      const count = Math.min(targets.length, files.length);
+      if (count === 1) { handleSlotFile(targets[0].angle, files[0]); return; }
+
+      setError('');
+      const firstAngle = targets[0].angle;
+      setLoadingSlot(firstAngle);
+
+      // Compress all files in parallel
+      const prepared = await Promise.all(
+        Array.from({ length: count }, async (_, i) => {
+          const angle = targets[i].angle;
+          const file = files[i];
+          const ex = images.find((img) => img.angle === angle);
+          if (ex) URL.revokeObjectURL(ex.preview);
+          const preview = createObjectUrl(file);
+          const dataUrl = await compressImageToDataUrl(file).catch(() => '');
+          return { id: `${Date.now()}-${Math.random()}`, file, preview, dataUrl, angle } as UploadedImage;
+        }),
+      );
+
+      const slotOrder = slots.map((s) => s.angle);
+      const anglesReplaced = new Set(prepared.map((p) => p.angle));
+      const retained = images.filter((img) => !anglesReplaced.has(img.angle));
+      const next = [...retained, ...prepared];
+      next.sort((a, b) => {
+        const ai = slotOrder.indexOf(a.angle);
+        const bi = slotOrder.indexOf(b.angle);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+      onImagesChange(next);
+      setLoadingSlot(null);
+      // Flash all newly filled slots
+      for (const p of prepared) {
+        setJustFilledSlot(p.angle);
+        await new Promise((r) => setTimeout(r, 80));
+      }
+      setTimeout(() => setJustFilledSlot(null), 900);
+    },
+    [images, onImagesChange, slots, handleSlotFile],
   );
 
   const removeImage = (angle: ViewAngle) => {
@@ -126,14 +171,10 @@ export default function ImageUploadStep({
     setGlobalDragActive(false);
     const files = Array.from(e.dataTransfer.files);
     if (!files.length) return;
-    // Distribute multiple dropped files to empty slots starting from this one
     const startIdx = slots.findIndex((s) => s.angle === angle);
     const targets = slots.slice(startIdx).filter((s) => !images.find((img) => img.angle === s.angle));
-    files.forEach((f, i) => {
-      const target = targets[i];
-      if (target) handleSlotFile(target.angle, f);
-    });
-  }, [handleSlotFile, slots, images]);
+    handleMultipleFiles(targets, files);
+  }, [handleMultipleFiles, slots, images]);
 
   const handleGlobalDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -154,12 +195,9 @@ export default function ImageUploadStep({
     setDragOverSlot(null);
     const files = Array.from(e.dataTransfer.files);
     if (!files.length) return;
-    // Distribute multiple files to empty slots in order
     const emptySlots = slots.filter((s) => !images.find((img) => img.angle === s.angle));
-    files.forEach((f, i) => {
-      if (emptySlots[i]) handleSlotFile(emptySlots[i].angle, f);
-    });
-  }, [slots, images, handleSlotFile]);
+    handleMultipleFiles(emptySlots, files);
+  }, [slots, images, handleMultipleFiles]);
 
   const nextEmptySlot = slots.find((s) => !images.find((img) => img.angle === s.angle));
 
@@ -167,19 +205,19 @@ export default function ImageUploadStep({
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const items = Array.from(e.clipboardData?.items ?? []);
-      const imageItem = items.find((i) => i.type.startsWith('image/'));
-      if (!imageItem) return;
-      const file = imageItem.getAsFile();
-      if (!file) return;
-      const target = slots.find((s) => !images.find((img) => img.angle === s.angle));
-      if (target) {
+      const imageItems = items.filter((i) => i.type.startsWith('image/'));
+      if (!imageItems.length) return;
+      const files = imageItems.map((i) => i.getAsFile()).filter(Boolean) as File[];
+      if (!files.length) return;
+      const emptySlots = slots.filter((s) => !images.find((img) => img.angle === s.angle));
+      if (emptySlots.length) {
         e.preventDefault();
-        handleSlotFile(target.angle, file);
+        handleMultipleFiles(emptySlots, files);
       }
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [slots, images, handleSlotFile]);
+  }, [slots, images, handleMultipleFiles]);
 
   const canGenerate = images.length > 0;
   const filledCount = images.filter((img) => slots.some((s) => s.angle === img.angle)).length;
@@ -328,13 +366,9 @@ export default function ImageUploadStep({
                   onChange={(e) => {
                     const files = Array.from(e.target.files ?? []);
                     if (!files.length) return;
-                    // Single file → fill this slot; multiple files → distribute to empty slots starting here
                     const startIdx = slots.findIndex((s) => s.angle === slot.angle);
                     const targets = slots.slice(startIdx).filter((s) => !images.find((img) => img.angle === s.angle));
-                    files.forEach((f, i) => {
-                      const target = targets[i];
-                      if (target) handleSlotFile(target.angle, f);
-                    });
+                    handleMultipleFiles(targets, files);
                     e.target.value = '';
                   }}
                 />
