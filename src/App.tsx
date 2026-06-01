@@ -101,13 +101,23 @@ export default function App() {
         )}
 
         {step === 'result' && gen.status === 'failed' && (
-          <div className="max-w-lg mx-auto text-center py-16 space-y-6">
-            <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto">
-              <AlertCircle className="w-10 h-10 text-red-400" />
+          <div className="max-w-md mx-auto text-center py-16 space-y-6 animate-slide-up">
+            <div className="relative mx-auto w-fit">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto"
+                   style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <AlertCircle className="w-10 h-10" style={{ color: 'rgba(248,113,113,0.9)' }} />
+              </div>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Error al generar</h2>
-              <p className="text-slate-400 text-sm leading-relaxed">{gen.error}</p>
+              <h2 className="text-2xl font-bold text-white mb-3">Error al generar</h2>
+              <p className="text-sm leading-relaxed rounded-xl px-5 py-4 mx-auto"
+                 style={{
+                   color: 'rgba(148,163,184,0.8)',
+                   background: 'rgba(255,255,255,0.02)',
+                   border: '1px solid rgba(255,255,255,0.06)',
+                 }}>
+                {gen.error}
+              </p>
             </div>
             <div className="flex gap-3 justify-center">
               <button
@@ -118,7 +128,7 @@ export default function App() {
                 Intentar de nuevo
               </button>
               <button onClick={() => setStep('config')} className="btn-secondary">
-                Cambiar API
+                Cambiar proveedor
               </button>
             </div>
           </div>
@@ -126,10 +136,11 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 inset-x-0 border-t border-[#1a1a38] bg-[#0a0a16]/90 backdrop-blur-sm py-3">
-        <p className="text-center text-xs text-slate-700">
+      <footer className="fixed bottom-0 inset-x-0 py-3"
+              style={{ background: 'rgba(7,7,26,0.9)', backdropFilter: 'blur(20px)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <p className="text-center text-xs" style={{ color: 'rgba(51,65,85,0.8)' }}>
           Generador 3D · Powered by{' '}
-          <span className="text-slate-600">Hunyuan 3D, Meshy AI & Stability AI</span>
+          <span style={{ color: 'rgba(71,85,105,0.7)' }}>Hunyuan 3D, TripoSR, Meshy AI &amp; Stability AI</span>
         </p>
       </footer>
     </div>

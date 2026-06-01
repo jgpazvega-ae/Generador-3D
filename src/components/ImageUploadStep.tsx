@@ -130,10 +130,14 @@ export default function ImageUploadStep({
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Sube fotos de tu pieza
+        <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase mb-4 px-3 py-1.5 rounded-full"
+             style={{ background: 'rgba(99,102,241,0.1)', color: 'rgba(165,180,252,0.8)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          Paso 2 de 3
+        </div>
+        <h2 className="text-3xl font-bold text-white mb-2">
+          Sube fotos <span className="text-gradient">de tu pieza</span>
         </h2>
-        <p className="text-slate-400 text-sm">
+        <p className="text-sm" style={{ color: 'rgba(100,116,139,0.8)' }}>
           {provider === 'stability'
             ? 'Este proveedor usa 1 imagen. Elige la mejor vista.'
             : `Sube hasta ${maxImages} fotos desde distintos ángulos para mejor calidad`}
@@ -147,10 +151,12 @@ export default function ImageUploadStep({
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          className={`
-            border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-200
-            ${dragging ? 'border-indigo-500 bg-indigo-500/5' : 'border-[#2a2a4a] hover:border-indigo-500/50 hover:bg-white/[0.02]'}
-          `}
+          className="relative rounded-2xl p-10 text-center cursor-pointer transition-all duration-300"
+          style={{
+            background: dragging ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.02)',
+            border: `2px dashed ${dragging ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.08)'}`,
+            boxShadow: dragging ? '0 0 30px rgba(99,102,241,0.12), inset 0 0 30px rgba(99,102,241,0.04)' : 'none',
+          }}
         >
           <input
             ref={inputRef}
@@ -162,27 +168,35 @@ export default function ImageUploadStep({
           />
           {loading ? (
             <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-400">Procesando imágenes...</p>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                   style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+              <p className="text-sm" style={{ color: 'rgba(148,163,184,0.7)' }}>Procesando imágenes...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 bg-[#1a1a38] rounded-2xl flex items-center justify-center">
-                <Upload className="w-7 h-7 text-indigo-400" />
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300"
+                   style={{
+                     background: dragging ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
+                     border: `1px solid ${dragging ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                   }}>
+                <Upload className="w-7 h-7" style={{ color: dragging ? '#a5b4fc' : 'rgba(99,102,241,0.7)' }} />
               </div>
               <div>
-                <p className="text-white font-medium">
+                <p className="font-medium text-white">
                   Arrastra aquí o{' '}
-                  <span className="text-indigo-400 underline underline-offset-2">
+                  <span style={{ color: '#a5b4fc', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
                     haz clic para seleccionar
                   </span>
                 </p>
-                <p className="text-slate-500 text-sm mt-1">
+                <p className="text-sm mt-1" style={{ color: 'rgba(71,85,105,0.8)' }}>
                   JPEG, PNG o WebP · máx. 20 MB por imagen
                 </p>
               </div>
               {images.length > 0 && (
-                <p className="text-slate-600 text-xs">
+                <p className="text-xs px-3 py-1 rounded-full"
+                   style={{ background: 'rgba(99,102,241,0.08)', color: 'rgba(165,180,252,0.7)' }}>
                   {images.length}/{maxImages} imagen{images.length !== 1 ? 'es' : ''} cargada{images.length !== 1 ? 's' : ''}
                 </p>
               )}
@@ -257,21 +271,26 @@ export default function ImageUploadStep({
         </div>
       )}
 
-      {/* Photo guidance for max similarity */}
-      <div className="flex items-start gap-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-4">
-        <Camera className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-indigo-300">
-            Cómo lograr ~99% de similitud
-          </p>
-          <ul className="text-sm text-slate-400 mt-1 space-y-0.5 list-disc list-inside">
-            {provider !== 'stability' && (
-              <li>Sube frente, atrás e izquierda/derecha del mismo objeto.</li>
-            )}
-            <li>Fondo liso y uniforme, buena iluminación sin sombras duras.</li>
-            <li>La pieza centrada, nítida y ocupando casi todo el encuadre.</li>
-            <li>Mantén la misma distancia y evita reflejos o brillos.</li>
-          </ul>
+      {/* Photo guidance */}
+      <div className="relative rounded-xl overflow-hidden"
+           style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(99,102,241,0.15)' }}>
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
+             style={{ background: 'linear-gradient(180deg, #6366f1, #7c3aed)' }} />
+        <div className="flex items-start gap-3 p-4 pl-5">
+          <Camera className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'rgba(99,102,241,0.8)' }} />
+          <div>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'rgba(165,180,252,0.9)' }}>
+              Cómo lograr ~99% de similitud
+            </p>
+            <ul className="text-sm space-y-0.5 list-disc list-inside" style={{ color: 'rgba(100,116,139,0.85)' }}>
+              {provider !== 'stability' && (
+                <li>Sube frente, atrás e izquierda/derecha del mismo objeto.</li>
+              )}
+              <li>Fondo liso y uniforme, buena iluminación sin sombras duras.</li>
+              <li>La pieza centrada, nítida y ocupando casi todo el encuadre.</li>
+              <li>Mantén la misma distancia y evita reflejos o brillos.</li>
+            </ul>
+          </div>
         </div>
       </div>
 

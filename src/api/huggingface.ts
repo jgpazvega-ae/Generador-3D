@@ -3,7 +3,6 @@ import type { UploadedImage, ModelResult } from '../types';
 const SPACE = 'https://stabilityai-triposr.hf.space';
 
 // ── Upload ────────────────────────────────────────────────────────────────────
-// Gradio 5.x: POST /gradio_api/upload  (falls back to /upload for 4.x)
 async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   const res0 = await fetch(dataUrl);
   const blob = await res0.blob();
@@ -13,11 +12,8 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
     const form = new FormData();
     form.append('files', blob, 'input.png');
     let res: Response;
-    try {
-      res = await fetch(`${SPACE}${prefix}/upload`, { method: 'POST', body: form });
-    } catch {
-      continue;
-    }
+    try { res = await fetch(`${SPACE}${prefix}/upload`, { method: 'POST', body: form }); }
+    catch { continue; }
     if (!res.ok) continue;
 
     const paths = (await res.json()) as (string | Record<string, unknown>)[];
@@ -45,18 +41,10 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
       meta: (f.meta as object | undefined) ?? { _type: 'gradio.FileData' },
     };
   }
-
   throw new Error('No se pudo subir la imagen a HuggingFace TripoSR');
 }
 
-// ── Gradio 5.x /call/ API ─────────────────────────────────────────────────────
-// POST /gradio_api/call/<endpoint>  → { event_id }
-// GET  /gradio_api/call/<endpoint>/<event_id>  → SSE
-
-interface GradioOutput {
-  data: unknown[];
-}
-
+// ── SSE listener (Gradio 5.x named events + 4.x fallback) ────────────────────
 function callEndpointSSE(
   endpoint: string,
   eventId: string,
@@ -73,31 +61,40 @@ function callEndpointSSE(
       reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
     }, 300_000);
 
-    es.addEventListener('error', (e) => {
-      // EventSource fires 'error' on SSE data events too — parse them
-      const raw = (e as MessageEvent).data;
-      if (typeof raw === 'string') {
-        try {
-          const parsed = JSON.parse(raw) as { output?: GradioOutput; msg?: string };
-          if (parsed.output?.data) {
-            clearTimeout(tmo);
-            es.close();
-            resolve(parsed.output.data);
-            return;
-          }
-        } catch { /* not JSON */ }
-      }
-      // Real connection error after a moment (not an SSE data error)
-      clearTimeout(tmo);
-      es.close();
-      reject(new Error('Conexión perdida con HuggingFace. Verifica tu internet.'));
+    const done = (data: unknown[]) => { clearTimeout(tmo); es.close(); resolve(data); };
+    const fail = (msg: string) => { clearTimeout(tmo); es.close(); reject(new Error(msg)); };
+
+    // ── Gradio 5.x named events ──────────────────────────────────────────
+    es.addEventListener('generating', () => {
+      onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
     });
 
-    es.onmessage = ({ data }) => {
-      let msg: { msg?: string; output?: GradioOutput; rank?: number; queue_size?: number };
-      try { msg = JSON.parse(data); } catch { return; }
+    es.addEventListener('complete', (e: Event) => {
+      try { done(JSON.parse((e as MessageEvent).data) as unknown[]); }
+      catch { done([]); }
+    });
 
+    // Named SSE 'error' event sent by Gradio 5.x server
+    es.addEventListener('error', (e: Event) => {
+      const me = e as MessageEvent;
+      if (me.data !== undefined) {
+        // Server-sent error event (has data payload)
+        fail(String(me.data || 'Error en el servidor de HuggingFace'));
+      }
+      // Connection-level errors are handled by onerror below
+    });
+
+    // ── Gradio 4.x unnamed events ─────────────────────────────────────────
+    es.onmessage = ({ data }) => {
+      let msg: {
+        msg?: string;
+        rank?: number;
+        queue_size?: number;
+        output?: { data?: unknown[]; error?: string };
+      };
+      try { msg = JSON.parse(data); } catch { return; }
       if (!msg.msg) return;
+
       if (msg.msg === 'estimation') {
         const pos = msg.rank ?? msg.queue_size ?? '?';
         onProgress(pStart, `En cola de HuggingFace: posición ${pos}...`);
@@ -106,26 +103,23 @@ function callEndpointSSE(
       } else if (msg.msg === 'process_generating') {
         onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
       } else if (msg.msg === 'process_completed') {
-        clearTimeout(tmo);
-        es.close();
-        const out = msg.output as (GradioOutput & { error?: string }) | undefined;
-        if (out?.error) reject(new Error(out.error));
-        else resolve(out?.data ?? []);
+        if (msg.output?.error) fail(msg.output.error);
+        else done(msg.output?.data ?? []);
       } else if (msg.msg === 'error') {
-        clearTimeout(tmo);
-        es.close();
-        reject(new Error('Error en el servidor de HuggingFace. Intenta de nuevo.'));
+        fail('Error en el servidor de HuggingFace. Intenta de nuevo.');
       }
     };
 
-    es.onerror = () => {
-      clearTimeout(tmo);
-      es.close();
-      reject(new Error('No se pudo conectar con HuggingFace. Verifica tu internet.'));
+    // Connection-level error (no data payload)
+    es.onerror = (e: Event) => {
+      const me = e as MessageEvent;
+      if (me.data !== undefined) return; // Named SSE event — already handled above
+      fail('No se pudo conectar con HuggingFace. Verifica tu internet.');
     };
   });
 }
 
+// ── Gradio 5.x /call/ API ─────────────────────────────────────────────────────
 async function callGradio(
   endpoint: string,
   data: unknown[],
@@ -138,12 +132,10 @@ async function callGradio(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { detail?: string };
     throw new Error(err.detail ?? `TripoSR error ${res.status} al llamar /${endpoint}`);
   }
-
   const { event_id } = await res.json() as { event_id: string };
   return callEndpointSSE(endpoint, event_id, onProgress, pStart, pEnd);
 }
@@ -157,67 +149,57 @@ export async function generateWithTripoSR(
   onProgress(3, 'Subiendo imagen a HuggingFace TripoSR...');
   const uploaded = await uploadImage(image.dataUrl);
 
-  // 2. Preprocess — named endpoint /preprocess (Gradio 5.x)
+  // 2. Preprocess
   onProgress(10, 'Preprocesando imagen...');
   const [preprocessed] = await callGradio('preprocess', [uploaded, true, 0.85], onProgress, 10, 30);
-
   if (preprocessed == null) throw new Error('Preprocesado falló — imagen no aceptada');
 
-  // 3. Generate 3D — named endpoint /generate
-  // Output: [OBJ FileData, GLB FileData] (space now provides both formats directly)
+  // 3. Generate 3D (space outputs both OBJ and GLB)
   onProgress(35, 'Generando modelo 3D (puede tardar 1–3 min)...');
   const genOut = await callGradio('generate', [preprocessed, 256], onProgress, 35, 92);
 
   onProgress(93, 'Descargando modelo 3D...');
 
-  // Find GLB and OBJ in outputs
-  type FileData = { url?: string; path?: string; orig_name?: string };
-  const toUrl = (fd: FileData | null) =>
+  type FD = { url?: string; path?: string; orig_name?: string };
+  const toUrl = (fd: FD | null) =>
     fd ? (fd.url ?? (fd.path ? `${SPACE}/file=${fd.path}` : null)) : null;
 
-  const glbData = genOut.find(
-    (o) => typeof o === 'object' && o !== null &&
-      ((o as FileData).orig_name?.endsWith('.glb') || (o as FileData).url?.endsWith('.glb') || (o as FileData).path?.endsWith('.glb'))
-  ) as FileData | undefined;
+  const glbData = genOut.find((o) => {
+    if (typeof o !== 'object' || !o) return false;
+    const f = o as FD;
+    return f.orig_name?.endsWith('.glb') || f.url?.endsWith('.glb') || f.path?.endsWith('.glb');
+  }) as FD | undefined;
 
-  const objData = genOut.find(
-    (o) => typeof o === 'object' && o !== null &&
-      ((o as FileData).orig_name?.endsWith('.obj') || (o as FileData).url?.endsWith('.obj') || (o as FileData).path?.endsWith('.obj'))
-  ) as FileData | undefined;
+  const objData = genOut.find((o) => {
+    if (typeof o !== 'object' || !o) return false;
+    const f = o as FD;
+    return f.orig_name?.endsWith('.obj') || f.url?.endsWith('.obj') || f.path?.endsWith('.obj');
+  }) as FD | undefined;
 
-  // Fallback: take first and second outputs
-  const firstData = (genOut[0] ?? null) as FileData | null;
-  const secondData = (genOut[1] ?? null) as FileData | null;
+  // Fallback ordering: first output is OBJ, second is GLB (TripoSR convention)
+  const glbRemote = toUrl(glbData ?? (genOut[1] as FD | null));
+  const objRemote = toUrl(objData ?? (genOut[0] as FD | null));
 
-  const glbUrl_remote = toUrl(glbData ?? secondData);
-  const objUrl_remote = toUrl(objData ?? firstData);
-
-  // Download GLB if available (space now outputs GLB natively — no conversion needed)
   let glbUrl = '';
-  if (glbUrl_remote) {
+  if (glbRemote) {
     try {
-      const r = await fetch(glbUrl_remote);
-      if (r.ok) {
-        const b = await r.blob();
-        glbUrl = URL.createObjectURL(b);
-      }
-    } catch { /* will fall through to OBJ */ }
+      const r = await fetch(glbRemote);
+      if (r.ok) glbUrl = URL.createObjectURL(await r.blob());
+    } catch { /* continue */ }
   }
 
   let objUrl: string | undefined;
-  if (objUrl_remote) {
+  if (objRemote) {
     try {
-      const r = await fetch(objUrl_remote);
+      const r = await fetch(objRemote);
       if (r.ok) {
         const b = await r.blob();
         objUrl = URL.createObjectURL(b);
-        // If no GLB yet, try converting OBJ → GLB
         if (!glbUrl) {
-          onProgress(94, 'Convirtiendo a GLB para vista previa...');
+          onProgress(94, 'Convirtiendo OBJ a GLB para vista previa...');
           try {
             const { convertObjToGlb } = await import('../utils/objToGlb');
-            const glbBlob = await convertObjToGlb(b);
-            glbUrl = URL.createObjectURL(glbBlob);
+            glbUrl = URL.createObjectURL(await convertObjToGlb(b));
           } catch { /* skip */ }
         }
       }
@@ -225,6 +207,5 @@ export async function generateWithTripoSR(
   }
 
   if (!glbUrl && !objUrl) throw new Error('No se pudo descargar el modelo 3D');
-
   return { glbUrl, objUrl, isBlob: true };
 }
