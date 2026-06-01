@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star, Sparkles, Server } from 'lucide-react';
+import { Eye, EyeOff, ExternalLink, ChevronRight, Zap, Layers, Star, Sparkles, Server, Check } from 'lucide-react';
 import type { ApiConfig, ApiProvider } from '../types';
 import { DEFAULT_REPLICATE_MODEL } from '../api/replicate';
 
@@ -13,10 +13,11 @@ interface ProviderInfo {
   name: string;
   description: string;
   badge: string;
-  badgeColor: string;
+  badgeStyle: React.CSSProperties;
   features: string[];
   docsUrl: string;
   icon: React.ReactNode;
+  iconGradient: string;
   keyLabel: string;
   keyPlaceholder: string;
   noKey?: boolean;
@@ -26,26 +27,28 @@ interface ProviderInfo {
 const PROVIDERS: ProviderInfo[] = [
   {
     id: 'huggingface',
-    name: 'Gratis — TripoSR (HuggingFace)',
-    description: 'Sin API key. Usa TripoSR de Stability AI vía HuggingFace Spaces. Una imagen → modelo 3D OBJ. Sujeto a disponibilidad de GPU.',
+    name: 'TripoSR — Gratis',
+    description: 'Sin API key. Stability AI vía HuggingFace Spaces. Una imagen → modelo 3D. Sujeto a disponibilidad de GPU.',
     badge: 'Sin API key',
-    badgeColor: 'bg-green-500/20 text-green-300 border border-green-500/30',
-    features: ['100% gratis', 'Sin registro', 'OBJ descargable', 'Cola pública'],
+    badgeStyle: { background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.25)' },
+    features: ['100% gratis', 'Sin registro', 'GLB + OBJ', 'Cola pública'],
     docsUrl: 'https://huggingface.co/spaces/stabilityai/TripoSR',
     icon: <Sparkles className="w-5 h-5" />,
+    iconGradient: 'linear-gradient(135deg, #10b981, #059669)',
     keyLabel: '',
     keyPlaceholder: '',
     noKey: true,
   },
   {
     id: 'shared',
-    name: 'Servidor propio (sin API key)',
-    description: 'Conecta tu propio servidor proxy. Los usuarios no necesitan API key — la guarda el servidor. Despliega gratis en Render.com.',
-    badge: 'Recomendado para producción',
-    badgeColor: 'bg-violet-500/20 text-violet-300 border border-violet-500/30',
-    features: ['Sin key para usuarios', 'Tú controlas los costos', 'Rate limiting', 'Gratis hospedar'],
+    name: 'Servidor propio',
+    description: 'Conecta tu propio proxy. Los usuarios no necesitan API key — la gestiona el servidor. Render.com gratis.',
+    badge: 'Para producción',
+    badgeStyle: { background: 'rgba(139,92,246,0.12)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' },
+    features: ['Sin key para usuarios', 'Rate limiting', 'Gratis hospedar'],
     docsUrl: 'https://render.com',
     icon: <Server className="w-5 h-5" />,
+    iconGradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
     keyLabel: 'URL del servidor proxy',
     keyPlaceholder: 'https://mi-proxy.onrender.com',
     isShared: true,
@@ -53,24 +56,26 @@ const PROVIDERS: ProviderInfo[] = [
   {
     id: 'replicate',
     name: 'Hunyuan 3D (Replicate)',
-    description: 'El modelo de Tencent del video. Usa hunyuan3d-2mv (multivista) automáticamente con varias fotos.',
+    description: 'Modelo de Tencent. Multivista automático con varias fotos para máxima calidad.',
     badge: 'Recomendado',
-    badgeColor: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
-    features: ['Multivista (mv)', 'Alta calidad', 'Open source', 'Gratis (tier)'],
+    badgeStyle: { background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.25)' },
+    features: ['Multivista', 'Alta calidad', 'Open source', 'Tier gratis'],
     docsUrl: 'https://replicate.com/tencent/hunyuan3d-2',
     icon: <Star className="w-5 h-5" />,
+    iconGradient: 'linear-gradient(135deg, #6366f1, #4338ca)',
     keyLabel: 'Replicate API Token',
     keyPlaceholder: 'r8_...',
   },
   {
     id: 'meshy',
     name: 'Meshy AI',
-    description: 'Mejor reconstrucción multi-vista. Endpoint multi-imagen, texturas 4K PBR (meshy-5/6).',
+    description: 'Mejor multi-vista. Texturas 4K PBR con meshy-5/6. Endpoint multi-imagen real.',
     badge: 'Mejor multi-vista',
-    badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-    features: ['Multi-imagen real', 'Texturas 4K PBR', 'GLB/FBX/OBJ', 'Créditos gratis'],
+    badgeStyle: { background: 'rgba(16,185,129,0.10)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.2)' },
+    features: ['Multi-imagen', 'Texturas 4K PBR', 'GLB/FBX/OBJ', 'Créditos gratis'],
     docsUrl: 'https://docs.meshy.ai/en/api/multi-image-to-3d',
     icon: <Layers className="w-5 h-5" />,
+    iconGradient: 'linear-gradient(135deg, #10b981, #0d9488)',
     keyLabel: 'Meshy API Key',
     keyPlaceholder: 'msy_...',
   },
@@ -79,10 +84,11 @@ const PROVIDERS: ProviderInfo[] = [
     name: 'Stability AI (SPAR3D)',
     description: 'Stable Point Aware 3D: predice la parte trasera no visible. Una imagen, muy rápido.',
     badge: 'Backside AI',
-    badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+    badgeStyle: { background: 'rgba(245,158,11,0.10)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.2)' },
     features: ['Predicción trasera', 'Respuesta directa', '1 imagen', 'Texturas 2K'],
     docsUrl: 'https://platform.stability.ai/docs/api-reference',
     icon: <Zap className="w-5 h-5" />,
+    iconGradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
     keyLabel: 'Stability API Key',
     keyPlaceholder: 'sk-...',
   },
@@ -134,81 +140,107 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto animate-slide-up">
+      {/* Header */}
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Configura tu proveedor de IA
+        <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase mb-4 px-3 py-1.5 rounded-full"
+             style={{ background: 'rgba(99,102,241,0.1)', color: 'rgba(165,180,252,0.8)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          Paso 1 de 3
+        </div>
+        <h2 className="text-3xl font-bold text-white mb-2">
+          Elige tu proveedor <span className="text-gradient">de IA</span>
         </h2>
-        <p className="text-slate-400">
-          Elige el servicio que usará la IA para generar tu modelo 3D
+        <p className="text-slate-500 text-sm">
+          Selecciona el servicio que generará el modelo 3D
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Provider cards */}
-        <div className="space-y-3">
-          {PROVIDERS.map((p) => (
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {PROVIDERS.map((p) => {
+          const selected = provider === p.id;
+          return (
             <button
               key={p.id}
               type="button"
               onClick={() => { setProvider(p.id); setError(''); }}
-              className={`
-                w-full text-left rounded-2xl border p-4 transition-all duration-200
-                ${
-                  provider === p.id
-                    ? 'border-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(99,102,241,0.1)]'
-                    : 'border-[#2a2a4a] bg-[#111128] hover:border-[#3a3a5a]'
-                }
-              `}
+              className={`w-full text-left rounded-2xl p-4 transition-all duration-300 ${selected ? 'provider-card-selected' : ''}`}
+              style={!selected ? {
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              } : {}}
+              onMouseEnter={e => {
+                if (!selected) Object.assign((e.currentTarget as HTMLElement).style, {
+                  background: 'rgba(255,255,255,0.04)',
+                  borderColor: 'rgba(255,255,255,0.1)',
+                });
+              }}
+              onMouseLeave={e => {
+                if (!selected) Object.assign((e.currentTarget as HTMLElement).style, {
+                  background: 'rgba(255,255,255,0.02)',
+                  borderColor: 'rgba(255,255,255,0.06)',
+                });
+              }}
             >
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3.5">
+                {/* Icon */}
                 <div
-                  className={`mt-0.5 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    provider === p.id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-[#1a1a38] text-slate-400'
-                  }`}
+                  className="mt-0.5 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-white transition-all duration-300"
+                  style={{
+                    background: selected ? p.iconGradient : 'rgba(255,255,255,0.04)',
+                    color: selected ? 'white' : 'rgba(148,163,184,0.6)',
+                    boxShadow: selected ? '0 4px 20px rgba(99,102,241,0.3)' : 'none',
+                    border: selected ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                  }}
                 >
                   {p.icon}
                 </div>
+
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-white">{p.name}</span>
-                    <span className={`badge ${p.badgeColor}`}>{p.badge}</span>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-semibold text-white text-[15px]">{p.name}</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={p.badgeStyle}>
+                      {p.badge}
+                    </span>
                   </div>
-                  <p className="text-sm text-slate-400 mt-1">{p.description}</p>
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <p className="text-[13px] leading-relaxed mb-2" style={{ color: 'rgba(148,163,184,0.65)' }}>
+                    {p.description}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
                     {p.features.map((f) => (
                       <span
                         key={f}
-                        className="text-xs text-slate-500 bg-[#0f0f25] px-2 py-0.5 rounded-full border border-[#2a2a4a]"
+                        className="text-[11px] px-2 py-0.5 rounded-full transition-colors"
+                        style={{
+                          background: selected ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)',
+                          color: selected ? 'rgba(165,180,252,0.9)' : 'rgba(100,116,139,0.8)',
+                          border: `1px solid ${selected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)'}`,
+                        }}
                       >
                         {f}
                       </span>
                     ))}
                   </div>
                 </div>
+
+                {/* Check indicator */}
                 <div
-                  className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-2.5 transition-colors ${
-                    provider === p.id
-                      ? 'border-indigo-500 bg-indigo-500'
-                      : 'border-[#3a3a5a]'
-                  }`}
+                  className="w-5 h-5 rounded-full flex-shrink-0 mt-1 flex items-center justify-center transition-all duration-300"
+                  style={selected
+                    ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)', boxShadow: '0 0 12px rgba(99,102,241,0.4)' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(255,255,255,0.12)' }
+                  }
                 >
-                  {provider === p.id && (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full" />
-                    </div>
-                  )}
+                  {selected && <Check className="w-3 h-3 text-white stroke-[3]" />}
                 </div>
               </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
 
         {/* Shared proxy config */}
         {isShared && (
-          <div className="card space-y-4">
+          <div className="card space-y-4 animate-scale-in">
             <div>
               <label className="label">URL del servidor proxy</label>
               <input
@@ -219,10 +251,10 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
                 onChange={(e) => { setProxyUrl(e.target.value); setError(''); }}
                 autoComplete="off"
               />
-              <p className="text-xs text-slate-600 mt-2">
+              <p className="text-xs mt-2" style={{ color: 'rgba(100,116,139,0.7)' }}>
                 Despliega el código de{' '}
                 <code className="text-violet-400">server/</code>
-                {' '}en Render.com y pega aquí la URL.
+                {' '}en Render.com y pega la URL aquí.
               </p>
             </div>
 
@@ -231,15 +263,16 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
               <select
                 value={sharedProvider}
                 onChange={(e) => setSharedProvider(e.target.value as typeof sharedProvider)}
-                className="w-full bg-[#0f0f25] border border-[#2a2a4a] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500 cursor-pointer"
+                className="w-full rounded-xl px-4 py-3 text-white outline-none transition-all duration-200 cursor-pointer text-sm"
+                style={{
+                  background: 'rgba(5,5,18,0.9)',
+                  border: '1px solid rgba(99,102,241,0.18)',
+                }}
               >
                 {SHARED_PROVIDERS.map((sp) => (
-                  <option key={sp.value} value={sp.value}>{sp.label}</option>
+                  <option key={sp.value} value={sp.value} style={{ background: '#0f0f25' }}>{sp.label}</option>
                 ))}
               </select>
-              <p className="text-xs text-slate-600 mt-1.5">
-                Debe coincidir con la API key configurada en el servidor.
-              </p>
             </div>
 
             {error && (
@@ -250,16 +283,19 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
           </div>
         )}
 
-        {/* API Key input — only for providers that require one */}
+        {/* API Key input */}
         {needsKey && (
-          <div className="card">
+          <div className="card animate-scale-in">
             <div className="flex items-center justify-between mb-3">
               <label className="label mb-0">{current.keyLabel}</label>
               <a
                 href={current.docsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                className="text-xs flex items-center gap-1 transition-colors"
+                style={{ color: 'rgba(99,102,241,0.8)' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = '#a5b4fc')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(99,102,241,0.8)')}
               >
                 Obtener key
                 <ExternalLink className="w-3 h-3" />
@@ -278,18 +314,20 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
               <button
                 type="button"
                 onClick={() => setShowKey((s) => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+                style={{ color: 'rgba(100,116,139,0.7)' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(148,163,184,0.9)')}
+                onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'rgba(100,116,139,0.7)')}
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-xs text-slate-600 mt-2">
+            <p className="text-[11px] mt-2" style={{ color: 'rgba(71,85,105,0.8)' }}>
               Tu API key se guarda solo en este navegador, nunca en ningún servidor.
             </p>
 
-            {/* Replicate model override */}
             {provider === 'replicate' && (
-              <div className="mt-4 pt-4 border-t border-[#2a2a4a]">
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <label className="label">Modelo de Replicate (opcional)</label>
                 <input
                   type="text"
@@ -298,10 +336,9 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
                   value={replicateModel}
                   onChange={(e) => setReplicateModel(e.target.value)}
                 />
-                <p className="text-xs text-slate-600 mt-1.5">
-                  Por defecto usa{' '}
-                  <code className="text-indigo-400">{DEFAULT_REPLICATE_MODEL}</code>.
-                  Puedes cambiarlo a cualquier modelo de Replicate compatible.
+                <p className="text-[11px] mt-1.5" style={{ color: 'rgba(71,85,105,0.8)' }}>
+                  Por defecto:{' '}
+                  <code className="text-indigo-400/80">{DEFAULT_REPLICATE_MODEL}</code>
                 </p>
               </div>
             )}
@@ -314,8 +351,22 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
           </div>
         )}
 
-        <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base">
-          Continuar
+        {/* No-key provider hint */}
+        {current.noKey && (
+          <div className="animate-scale-in flex items-start gap-3 rounded-xl px-4 py-3"
+               style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+            <Check className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5 stroke-[2.5]" />
+            <p className="text-[13px]" style={{ color: 'rgba(110,231,183,0.8)' }}>
+              No necesitas ninguna API key. Puedes continuar directamente.
+            </p>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="btn-primary w-full flex items-center justify-center gap-2 py-4 text-base mt-2"
+        >
+          Continuar con {current.name}
           <ChevronRight className="w-5 h-5" />
         </button>
       </form>
