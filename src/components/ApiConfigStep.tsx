@@ -31,15 +31,15 @@ const PROVIDERS: ProviderInfo[] = [
   {
     id: 'huggingface',
     name: 'TripoSR',
-    tagline: 'Gratis · Sin registro',
-    description: 'Stability AI via HuggingFace Spaces. Una foto → modelo 3D en segundos. Sujeto a disponibilidad de GPU pública.',
+    tagline: 'Gratis · Sin registro · Verificado',
+    description: 'Stability AI via HuggingFace Spaces. Una foto → modelo 3D en segundos. 100% gratis, sin cuenta. Puede tardar 1–3 min si la GPU está inactiva.',
     badge: 'Sin API key',
     badgeStyle: { background: 'rgba(16,185,129,0.12)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,0.25)' },
-    features: ['100% gratis', 'Sin cuenta', 'GLB + OBJ', 'Cola pública'],
+    features: ['100% gratis', 'Sin cuenta', 'GLB + OBJ', 'Verificado ✓'],
     stats: [
       { label: 'Costo', value: 'Gratis' },
       { label: 'Vistas', value: '1 imagen' },
-      { label: 'Tiempo', value: '~30s' },
+      { label: 'Tiempo', value: '1–3 min' },
     ],
     docsUrl: 'https://huggingface.co/spaces/stabilityai/TripoSR',
     icon: <Sparkles className="w-5 h-5" />,
@@ -50,35 +50,15 @@ const PROVIDERS: ProviderInfo[] = [
     noKey: true,
   },
   {
-    id: 'meshy',
-    name: 'Meshy AI',
-    tagline: 'Multi-vista · 4K PBR',
-    description: 'El mejor resultado multi-imagen. Texturas 4K PBR con meshy-5/6. Endpoint multi-imagen real para máxima similitud.',
-    badge: 'Mejor calidad',
-    badgeStyle: { background: 'rgba(56,189,248,0.12)', color: '#7dd3fc', border: '1px solid rgba(56,189,248,0.25)' },
-    features: ['Multi-imagen', 'Texturas 4K PBR', 'GLB/FBX/OBJ', 'Créditos gratis'],
-    stats: [
-      { label: 'Costo', value: 'Créditos' },
-      { label: 'Vistas', value: 'Hasta 4' },
-      { label: 'Tiempo', value: '~2 min' },
-    ],
-    docsUrl: 'https://docs.meshy.ai/en/api/multi-image-to-3d',
-    icon: <Layers className="w-5 h-5" />,
-    accentColor: '#38bdf8',
-    glowColor: 'rgba(56,189,248,0.18)',
-    keyLabel: 'Meshy API Key',
-    keyPlaceholder: 'msy_...',
-  },
-  {
     id: 'replicate',
     name: 'Hunyuan 3D',
-    tagline: 'Replicate · Multivista',
-    description: 'Modelo de Tencent vía Replicate. Multi-vista automático con frente/atrás/izquierda para máxima calidad de geometría.',
-    badge: 'Recomendado',
+    tagline: 'Multi-vista · Tier gratis en Replicate',
+    description: 'Modelo open-source de Tencent vía Replicate. Hasta 4 ángulos para máxima calidad de geometría. Replicate ofrece créditos gratis al registrarte.',
+    badge: 'Mejor multi-imagen',
     badgeStyle: { background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' },
-    features: ['Multi-vista', 'Alta calidad', 'Open source', 'Tier gratis'],
+    features: ['Hasta 4 vistas', 'Alta calidad', 'Open source', 'Tier gratis'],
     stats: [
-      { label: 'Costo', value: 'Por uso' },
+      { label: 'Costo', value: 'Créditos' },
       { label: 'Vistas', value: '1 – 4' },
       { label: 'Tiempo', value: '~3 min' },
     ],
@@ -88,6 +68,26 @@ const PROVIDERS: ProviderInfo[] = [
     glowColor: 'rgba(99,102,241,0.2)',
     keyLabel: 'Replicate API Token',
     keyPlaceholder: 'r8_...',
+  },
+  {
+    id: 'meshy',
+    name: 'Meshy AI',
+    tagline: 'Texturas 4K PBR · Requiere suscripción',
+    description: 'Mejor calidad de texturas con meshy-5/6. ⚠ La API multi-imagen requiere plan de pago — el plan Free no incluye acceso a este endpoint.',
+    badge: 'Plan de pago',
+    badgeStyle: { background: 'rgba(245,158,11,0.12)', color: '#fcd34d', border: '1px solid rgba(245,158,11,0.25)' },
+    features: ['Texturas 4K PBR', 'Hasta 4 vistas', 'GLB/FBX/OBJ', 'Suscripción requerida'],
+    stats: [
+      { label: 'Costo', value: 'Suscripción' },
+      { label: 'Vistas', value: 'Hasta 4' },
+      { label: 'Tiempo', value: '~2 min' },
+    ],
+    docsUrl: 'https://docs.meshy.ai/en/api/multi-image-to-3d',
+    icon: <Layers className="w-5 h-5" />,
+    accentColor: '#38bdf8',
+    glowColor: 'rgba(56,189,248,0.18)',
+    keyLabel: 'Meshy API Key',
+    keyPlaceholder: 'msy_...',
   },
   {
     id: 'stability',
@@ -413,6 +413,21 @@ export default function ApiConfigStep({ initialConfig, onSave }: Props) {
                 <p className="text-[11px] mt-1.5" style={{ color: 'rgba(71,85,105,0.75)' }}>
                   Por defecto: <code className="text-indigo-400/80">{DEFAULT_REPLICATE_MODEL}</code>
                 </p>
+              </div>
+            )}
+
+            {provider === 'meshy' && (
+              <div className="mt-4 pt-4 flex items-start gap-2.5 rounded-xl px-3 py-2.5 animate-slide-down"
+                   style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <span className="text-base flex-shrink-0">⚠️</span>
+                <div>
+                  <p className="text-[12px] font-semibold mb-0.5" style={{ color: 'rgba(253,230,138,0.9)' }}>
+                    La API multi-imagen requiere plan de pago
+                  </p>
+                  <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.65)' }}>
+                    El plan Free de Meshy no incluye acceso al endpoint multi-imagen. Necesitas al menos el plan Starter. Si solo tienes créditos gratuitos, usa Hunyuan 3D en su lugar.
+                  </p>
+                </div>
               </div>
             )}
 
