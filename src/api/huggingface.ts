@@ -2,6 +2,18 @@ import type { UploadedImage, ModelResult } from '../types';
 
 const SPACE = 'https://stabilityai-triposr.hf.space';
 
+type FD = { url?: string; path?: string; orig_name?: string };
+
+// Build a download URL that actually works. The space's own `url` field is
+// buggy (it emits `/ca/file=…` which 404s), so we construct `/file=<path>`
+// ourselves — confirmed working — and only fall back to the server url.
+function fileUrl(fd: FD | null | undefined): string | null {
+  if (!fd) return null;
+  if (fd.path) return `${SPACE}/file=${fd.path}`;
+  if (fd.url) return fd.url;
+  return null;
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
 async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   const res0 = await fetch(dataUrl);
@@ -44,80 +56,119 @@ async function uploadImage(dataUrl: string): Promise<Record<string, unknown>> {
   throw new Error('No se pudo subir la imagen a HuggingFace TripoSR');
 }
 
-// ── SSE listener (named events + fallback) ────────────────────────────────────
-function callEndpointSSE(
+// ── SSE via fetch streaming ───────────────────────────────────────────────────
+// We deliberately avoid EventSource: it auto-reconnects when the server closes
+// the stream, and reconnecting to a consumed event_id returns an error — which
+// turns every normal completion (or transient idle during a long GPU wait) into
+// a spurious failure. A single streamed fetch gives us full control instead.
+async function callEndpointSSE(
   endpoint: string,
   eventId: string,
   onProgress: (p: number, m: string) => void,
   pStart: number,
   pEnd: number,
 ): Promise<unknown[]> {
-  return new Promise((resolve, reject) => {
-    const url = `${SPACE}/call/${endpoint}/${eventId}`;
-    const es = new EventSource(url);
+  const url = `${SPACE}/call/${endpoint}/${eventId}`;
 
-    const tmo = setTimeout(() => {
-      es.close();
-      reject(new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.'));
-    }, 300_000);
+  const ctrl = new AbortController();
+  const tmo = setTimeout(() => ctrl.abort(), 300_000); // 5 min hard cap
 
-    let settled = false;
-    const done = (data: unknown[]) => {
-      if (settled) return; settled = true;
-      clearTimeout(tmo); es.close(); resolve(data);
-    };
-    const fail = (msg: string) => {
-      if (settled) return; settled = true;
-      clearTimeout(tmo); es.close(); reject(new Error(msg));
-    };
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal: ctrl.signal });
+  } catch (e) {
+    clearTimeout(tmo);
+    if ((e as Error).name === 'AbortError') {
+      throw new Error('Tiempo agotado esperando GPU (5 min). Intenta de nuevo.');
+    }
+    throw new Error('No se pudo conectar con HuggingFace. Verifica tu internet.');
+  }
 
-    es.addEventListener('generating', () => {
-      onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
-    });
+  if (!res.ok || !res.body) {
+    clearTimeout(tmo);
+    throw new Error(`HuggingFace respondió ${res.status} en /${endpoint}`);
+  }
 
-    es.addEventListener('complete', (e: Event) => {
-      try { done(JSON.parse((e as MessageEvent).data) as unknown[]); }
-      catch { done([]); }
-    });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let eventName = '';
+  let dataLine = '';
 
-    es.addEventListener('error', (e: Event) => {
-      const me = e as MessageEvent;
-      if (me.data !== undefined) {
-        fail(String(me.data || 'Error en el servidor de HuggingFace'));
-      }
-    });
-
-    es.onmessage = ({ data }) => {
-      let msg: {
-        msg?: string;
-        rank?: number;
-        queue_size?: number;
+  // Parse one complete SSE event (event name + data). Returns a result or null.
+  const handleEvent = (): { ok: true; data: unknown[] } | { ok: false; error: string } | null => {
+    if (eventName === 'generating') {
+      onProgress(pStart + (pEnd - pStart) * 0.6, 'Generando malla 3D...');
+      return null;
+    }
+    if (eventName === 'complete') {
+      try { return { ok: true, data: JSON.parse(dataLine) as unknown[] }; }
+      catch { return { ok: true, data: [] }; }
+    }
+    if (eventName === 'error') {
+      // The server sends `data: null` for "no result"; treat as a retryable error.
+      const msg = !dataLine || dataLine === 'null'
+        ? 'El servidor de HuggingFace no devolvió un modelo. Reintentando...'
+        : dataLine;
+      return { ok: false, error: msg };
+    }
+    // Unnamed / Gradio 4.x style message
+    try {
+      const m = JSON.parse(dataLine) as {
+        msg?: string; rank?: number; queue_size?: number;
         output?: { data?: unknown[]; error?: string };
       };
-      try { msg = JSON.parse(data); } catch { return; }
-      if (!msg.msg) return;
-
-      if (msg.msg === 'estimation') {
-        const pos = msg.rank ?? msg.queue_size ?? '?';
-        onProgress(pStart, `En cola de HuggingFace: posición ${pos}...`);
-      } else if (msg.msg === 'process_starts') {
+      if (m.msg === 'estimation') {
+        onProgress(pStart, `En cola de HuggingFace: posición ${m.rank ?? m.queue_size ?? '?'}...`);
+      } else if (m.msg === 'process_starts') {
         onProgress(pStart + (pEnd - pStart) * 0.3, 'GPU asignada, procesando...');
-      } else if (msg.msg === 'process_generating') {
-        onProgress(pStart + (pEnd - pStart) * 0.65, 'Generando malla 3D...');
-      } else if (msg.msg === 'process_completed') {
-        if (msg.output?.error) fail(msg.output.error);
-        else done(msg.output?.data ?? []);
-      } else if (msg.msg === 'error') {
-        fail('Error en el servidor de HuggingFace. Intenta de nuevo.');
+      } else if (m.msg === 'process_generating') {
+        onProgress(pStart + (pEnd - pStart) * 0.6, 'Generando malla 3D...');
+      } else if (m.msg === 'process_completed') {
+        if (m.output?.error) return { ok: false, error: m.output.error };
+        return { ok: true, data: m.output?.data ?? [] };
       }
-    };
+    } catch { /* not JSON, ignore */ }
+    return null;
+  };
 
-    es.onerror = (e: Event) => {
-      const me = e as MessageEvent;
-      if (me.data !== undefined) return;
-      fail('No se pudo conectar con HuggingFace. Verifica tu internet.');
-    };
-  });
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Split into SSE event blocks separated by a blank line.
+      let sep: number;
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+
+        eventName = '';
+        dataLine = '';
+        for (const raw of block.split('\n')) {
+          if (raw.startsWith('event:')) eventName = raw.slice(6).trim();
+          else if (raw.startsWith('data:')) {
+            const part = raw.slice(5).replace(/^ /, '');
+            dataLine = dataLine ? dataLine + '\n' + part : part;
+          }
+        }
+
+        const result = handleEvent();
+        if (result) {
+          clearTimeout(tmo);
+          ctrl.abort(); // stop the stream cleanly
+          if (result.ok) return result.data;
+          throw new Error(result.error);
+        }
+      }
+    }
+  } finally {
+    clearTimeout(tmo);
+  }
+
+  // Stream ended with no terminal event.
+  throw new Error('La conexión con HuggingFace se cerró antes de terminar.');
 }
 
 // ── /call/ API ────────────────────────────────────────────────────────────────
@@ -158,24 +209,18 @@ export async function generateWithTripoSR(
 
   onProgress(93, 'Descargando modelo 3D...');
 
-  type FD = { url?: string; path?: string; orig_name?: string };
-  const toUrl = (fd: FD | null) =>
-    fd ? (fd.url ?? (fd.path ? `${SPACE}/file=${fd.path}` : null)) : null;
+  const isExt = (f: FD, ext: string) =>
+    f.orig_name?.endsWith(ext) || f.path?.endsWith(ext) || f.url?.endsWith(ext);
 
-  const glbData = genOut.find((o) => {
-    if (typeof o !== 'object' || !o) return false;
-    const f = o as FD;
-    return f.orig_name?.endsWith('.glb') || f.url?.endsWith('.glb') || f.path?.endsWith('.glb');
-  }) as FD | undefined;
+  const asFD = (o: unknown): FD | null =>
+    o && typeof o === 'object' ? (o as FD) : null;
 
-  const objData = genOut.find((o) => {
-    if (typeof o !== 'object' || !o) return false;
-    const f = o as FD;
-    return f.orig_name?.endsWith('.obj') || f.url?.endsWith('.obj') || f.path?.endsWith('.obj');
-  }) as FD | undefined;
+  const glbData = genOut.map(asFD).find((f) => f && isExt(f, '.glb')) ?? null;
+  const objData = genOut.map(asFD).find((f) => f && isExt(f, '.obj')) ?? null;
 
-  const glbRemote = toUrl(glbData ?? (genOut[1] as FD | null));
-  const objRemote = toUrl(objData ?? (genOut[0] as FD | null));
+  // Fallback to TripoSR output order: [0] = OBJ, [1] = GLB
+  const glbRemote = fileUrl(glbData ?? asFD(genOut[1]));
+  const objRemote = fileUrl(objData ?? asFD(genOut[0]));
 
   let glbUrl = '';
   if (glbRemote) {
